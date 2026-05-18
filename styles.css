@@ -463,6 +463,15 @@ button {
   align-self: flex-start;
 }
 
+.message.past-day {
+  filter: grayscale(0.25);
+  opacity: 0.72;
+}
+
+.message.past-day .bubble {
+  box-shadow: none;
+}
+
 .message-meta {
   padding: 0 11px;
   margin-top: 8px;

@@ -49,6 +49,15 @@ function cleanDate(value) {
   return new Date().toISOString().slice(0, 10);
 }
 
+function cleanLimit(value) {
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit)) {
+    return 5;
+  }
+
+  return Math.min(50, Math.max(1, limit));
+}
+
 async function ensureSchema(db) {
   schemaReady ??= (async () => {
     await db`
@@ -119,18 +128,34 @@ exports.handler = async (event) => {
     const room = cleanRoom(event.queryStringParameters?.room);
     const chatDate = cleanDate(event.queryStringParameters?.date);
     const viewer = cleanText(event.queryStringParameters?.viewer, 24);
+    const feed = event.queryStringParameters?.feed === "room";
+    const limit = cleanLimit(event.queryStringParameters?.limit);
+    const before = event.queryStringParameters?.before ? new Date(event.queryStringParameters.before) : null;
+    const hasBefore = before instanceof Date && !Number.isNaN(before.getTime());
 
     if (viewer) {
-      await db`
-        INSERT INTO message_reads (message_id, viewer)
-        SELECT id, ${viewer}
-        FROM messages
-        WHERE room = ${room}
-          AND chat_date = ${chatDate}::date
-          AND author <> ${viewer}
-        ON CONFLICT (message_id, viewer)
-        DO UPDATE SET seen_at = NOW()
-      `;
+      if (feed) {
+        await db`
+          INSERT INTO message_reads (message_id, viewer)
+          SELECT id, ${viewer}
+          FROM messages
+          WHERE room = ${room}
+            AND author <> ${viewer}
+          ON CONFLICT (message_id, viewer)
+          DO UPDATE SET seen_at = NOW()
+        `;
+      } else {
+        await db`
+          INSERT INTO message_reads (message_id, viewer)
+          SELECT id, ${viewer}
+          FROM messages
+          WHERE room = ${room}
+            AND chat_date = ${chatDate}::date
+            AND author <> ${viewer}
+          ON CONFLICT (message_id, viewer)
+          DO UPDATE SET seen_at = NOW()
+        `;
+      }
     }
 
     const days = await db`
@@ -155,7 +180,46 @@ exports.handler = async (event) => {
         `
       : [];
 
-    const rows = await db`
+    const queryLimit = limit + 1;
+    const rows = feed
+      ? await db`
+      SELECT
+        m.id,
+        m.room,
+        m.author,
+        m.text,
+        m.chat_date,
+        m.created_at,
+        m.edited_at,
+        COALESCE(
+          ARRAY_AGG(DISTINCT r.viewer)
+            FILTER (WHERE r.viewer IS NOT NULL AND r.viewer <> m.author),
+          ARRAY[]::TEXT[]
+        ) AS seen_by,
+        COALESCE(
+          JSONB_AGG(
+            DISTINCT JSONB_BUILD_OBJECT(
+              'oldText', e.old_text,
+              'newText', e.new_text,
+              'editedAt', e.edited_at
+            )
+          ) FILTER (WHERE e.id IS NOT NULL),
+          '[]'::JSONB
+        ) AS edit_history
+      FROM (
+        SELECT id, room, author, text, chat_date, created_at, edited_at
+        FROM messages
+        WHERE room = ${room}
+          AND (${hasBefore} = FALSE OR created_at < ${hasBefore ? before.toISOString() : new Date().toISOString()}::timestamptz)
+        ORDER BY created_at DESC
+        LIMIT ${queryLimit}
+      ) m
+      LEFT JOIN message_reads r ON r.message_id = m.id
+      LEFT JOIN message_edits e ON e.message_id = m.id
+      GROUP BY m.id, m.room, m.author, m.text, m.chat_date, m.created_at, m.edited_at
+      ORDER BY m.created_at ASC
+    `
+      : await db`
       SELECT
         m.id,
         m.room,
@@ -192,6 +256,8 @@ exports.handler = async (event) => {
       GROUP BY m.id, m.room, m.author, m.text, m.chat_date, m.created_at, m.edited_at
       ORDER BY m.created_at ASC
     `;
+    const hasMore = rows.length > limit;
+    const visibleRows = hasMore ? rows.slice(1) : rows;
 
     return json(200, {
       days: days.map((day) => ({
@@ -199,7 +265,8 @@ exports.handler = async (event) => {
         count: day.count,
       })),
       typing: typing.map((row) => row.author),
-      messages: rows.map((row) => ({
+      hasMore,
+      messages: visibleRows.map((row) => ({
         id: row.id,
         room: row.room,
         author: row.author,

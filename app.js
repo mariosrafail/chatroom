@@ -8,24 +8,29 @@ const notificationIcon = "/icons/icon-192.png";
 const todayDate = getLocalDateKey();
 const typingIdleMs = 4200;
 const typingThrottleMs = 1800;
+const messagePageSize = 5;
 const themeLocation = { latitude: 37.9838, longitude: 23.7275 };
 
-const fallbackMessages = {
-  [todayDate]: [
-    {
-      id: "local-1",
-      author: "Nikos",
-      text: "Welcome to the chat room.",
-      createdAt: Date.now() - 1000 * 60 * 11,
-    },
-    {
-      id: "local-2",
-      author: "Eleni",
-      text: "The mobile layout is ready for testing.",
-      createdAt: Date.now() - 1000 * 60 * 7,
-    },
-  ],
-};
+const fallbackMessages = [
+  {
+    id: "local-1",
+    author: "Nikos",
+    text: "Welcome to the chat room.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 11).toISOString(),
+    chatDate: todayDate,
+    seenBy: [],
+    editHistory: [],
+  },
+  {
+    id: "local-2",
+    author: "Eleni",
+    text: "The mobile layout is ready for testing.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
+    chatDate: todayDate,
+    seenBy: [],
+    editHistory: [],
+  },
+];
 
 const state = {
   profileName: loadProfileName(),
@@ -36,6 +41,8 @@ const state = {
   sun: null,
   online: false,
   loading: false,
+  loadingOlder: false,
+  hasMoreMessages: true,
   messages: structuredClone(fallbackMessages),
 };
 const deliveryState = new Map();
@@ -178,7 +185,7 @@ function normalizeMessage(message) {
     author: message.author,
     text: cleanMessageText(message.text),
     createdAt: message.createdAt || message.created_at,
-    chatDate: normalizeDateKey(message.chatDate || message.chat_date || state.activeDate),
+    chatDate: normalizeDateKey(message.chatDate || message.chat_date || getLocalDateKey()),
     editedAt: message.editedAt || message.edited_at || null,
     editHistory: normalizeEditHistory(message.editHistory || message.edit_history || []),
     seenBy: message.seenBy || message.seen_by || [],
@@ -233,15 +240,21 @@ function renderNotificationButton() {
   notifyButton.classList.toggle("blocked", Notification.permission === "denied");
 }
 
-function renderMessages() {
-  const roomMessages = (state.messages[state.activeDate] ?? []).filter((message) => message.text.length > 0);
+function renderMessages({ scroll = "preserve" } = {}) {
+  const previousScrollHeight = messagesEl.scrollHeight;
+  const previousScrollTop = messagesEl.scrollTop;
+  const roomMessages = [...state.messages]
+    .filter((message) => message.text.length > 0)
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   const latestOwnMessage = [...roomMessages].reverse().find((message) => message.author === state.profileName);
   messagesEl.replaceChildren();
 
-  const dayChip = document.createElement("div");
-  dayChip.className = "day-chip";
-  dayChip.textContent = state.loading ? "Loading..." : formatFullDate(state.activeDate);
-  messagesEl.append(dayChip);
+  if (state.loading || state.loadingOlder) {
+    const loading = document.createElement("div");
+    loading.className = "day-chip";
+    loading.textContent = state.loadingOlder ? "Loading older..." : "Loading...";
+    messagesEl.append(loading);
+  }
 
   if (roomMessages.length === 0) {
     const empty = document.createElement("div");
@@ -256,12 +269,23 @@ function renderMessages() {
     const isLatestOwn = latestOwnMessage?.id === message.id;
     const previousMessage = roomMessages[index - 1];
     const nextMessage = roomMessages[index + 1];
+    const isPastDay = message.chatDate !== getLocalDateKey();
     const groupedWithPrevious = isGroupedMessage(previousMessage, message);
     const continuesGroup = isGroupedMessage(message, nextMessage);
+
+    if (previousMessage?.chatDate !== message.chatDate) {
+      const dayChip = document.createElement("div");
+      dayChip.className = "day-chip";
+      dayChip.dataset.date = message.chatDate;
+      dayChip.textContent = formatFullDate(message.chatDate);
+      messagesEl.append(dayChip);
+    }
+
     const item = document.createElement("article");
     item.className = `message ${isMine ? "mine" : "theirs"}`;
     item.classList.toggle("grouped", groupedWithPrevious);
     item.classList.toggle("continues", continuesGroup);
+    item.classList.toggle("past-day", isPastDay);
     if (!renderedMessageIds.has(message.id)) {
       item.classList.add("new-message");
     }
@@ -304,11 +328,17 @@ function renderMessages() {
 
   renderTypingIndicator();
 
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (scroll === "bottom") {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  } else if (scroll === "keep-top") {
+    messagesEl.scrollTop = messagesEl.scrollHeight - previousScrollHeight + previousScrollTop;
+  } else if (scroll === "preserve") {
+    messagesEl.scrollTop = previousScrollTop;
+  }
 }
 
 function renderTypingIndicator() {
-  if (!isTodayActive() || state.typingUsers.length === 0) {
+  if (state.typingUsers.length === 0) {
     return;
   }
 
@@ -370,7 +400,12 @@ function attachMessageActions(element, message) {
 }
 
 function isGroupedMessage(firstMessage, secondMessage) {
-  if (!firstMessage || !secondMessage || firstMessage.author !== secondMessage.author) {
+  if (
+    !firstMessage ||
+    !secondMessage ||
+    firstMessage.author !== secondMessage.author ||
+    firstMessage.chatDate !== secondMessage.chatDate
+  ) {
     return false;
   }
 
@@ -381,10 +416,10 @@ function isGroupedMessage(firstMessage, secondMessage) {
   return Math.abs(secondTime - firstTime) <= fiveMinutes;
 }
 
-function render() {
+function render(options = {}) {
   closeMessageMenu();
   renderHeader();
-  renderMessages();
+  renderMessages(options);
   renderComposerState();
 }
 
@@ -425,15 +460,42 @@ function mergeAvailableDays() {
   return [...daysByDate.values()].sort((a, b) => b.chatDate.localeCompare(a.chatDate));
 }
 
-async function fetchMessages({ showLoading = false } = {}) {
+function mergeMessages(messages) {
+  const byId = new Map(state.messages.map((message) => [message.id, message]));
+  messages.forEach((message) => byId.set(message.id, message));
+  state.messages = [...byId.values()].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
+
+function isNearMessageBottom() {
+  return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
+}
+
+async function fetchMessages({ showLoading = false, older = false } = {}) {
+  if (older && (state.loadingOlder || !state.hasMoreMessages)) {
+    return;
+  }
+
+  const wasNearBottom = isNearMessageBottom();
   if (showLoading) {
     state.loading = true;
+    render();
+  }
+  if (older) {
+    state.loadingOlder = true;
     render();
   }
 
   try {
     refreshTodayDate();
-    const params = new URLSearchParams({ room: state.activeRoom, date: state.activeDate });
+    const params = new URLSearchParams({
+      room: state.activeRoom,
+      date: getLocalDateKey(),
+      feed: "room",
+      limit: String(messagePageSize),
+    });
+    if (older && state.messages.length > 0) {
+      params.set("before", state.messages[0].createdAt);
+    }
     if (state.profileName) {
       params.set("viewer", state.profileName);
     }
@@ -452,8 +514,14 @@ async function fetchMessages({ showLoading = false } = {}) {
         message.author !== state.profileName
     );
 
-    state.messages[state.activeDate] = nextMessages;
+    if (showLoading) {
+      state.messages = state.messages.filter((message) => !message.id.startsWith("local-"));
+    }
+    mergeMessages(nextMessages);
     state.availableDays = normalizeDays(data.days);
+    if (older || showLoading) {
+      state.hasMoreMessages = Boolean(data.hasMore);
+    }
     state.typingUsers = Array.isArray(data.typing) ? data.typing.filter((name) => name !== state.profileName) : [];
     nextMessages.forEach((message) => knownRemoteMessageIds.add(message.id));
     hasLoadedRemoteMessages = true;
@@ -464,12 +532,13 @@ async function fetchMessages({ showLoading = false } = {}) {
     state.online = false;
   } finally {
     state.loading = false;
-    render();
+    state.loadingOlder = false;
+    render({ scroll: older ? "keep-top" : wasNearBottom || showLoading ? "bottom" : "preserve" });
   }
 }
 
 async function sendTypingStatus(isTyping) {
-  if (!state.profileName || !isTodayActive()) {
+  if (!state.profileName) {
     return;
   }
 
@@ -493,7 +562,7 @@ async function sendTypingStatus(isTyping) {
 }
 
 function scheduleTypingStatus() {
-  if (!state.profileName || !isTodayActive()) {
+  if (!state.profileName) {
     return;
   }
 
@@ -674,7 +743,7 @@ function isTodayActive() {
 function canModifyMessage(message) {
   return Boolean(
     message &&
-      isTodayActive() &&
+      message.chatDate === getLocalDateKey() &&
       message.author === state.profileName &&
       /^\d+$/.test(message.id)
   );
@@ -791,9 +860,7 @@ async function deleteSelectedMessage() {
       throw new Error("Delete failed");
     }
 
-    state.messages[state.activeDate] = state.messages[state.activeDate].filter(
-      (message) => message.id !== selectedMessage.id
-    );
+    state.messages = state.messages.filter((message) => message.id !== selectedMessage.id);
     selectedMessage = null;
     render();
     fetchMessages();
@@ -883,11 +950,6 @@ function showIncomingNotification(message) {
 }
 
 async function addMessage(text) {
-  if (!isTodayActive()) {
-    showToast("Past days are locked.");
-    return;
-  }
-
   if (!state.profileName) {
     openProfileDialog({ required: true });
     return;
@@ -913,9 +975,9 @@ async function addMessage(text) {
   sendTypingStatus(false);
   keepComposerFocused();
   state.activeDate = getLocalDateKey();
-  state.messages[state.activeDate] ??= [];
-  state.messages[state.activeDate].push(optimisticMessage);
-  render();
+  state.messages.push(optimisticMessage);
+  mergeMessages([]);
+  render({ scroll: "bottom" });
   keepComposerFocused();
 
   try {
@@ -940,15 +1002,13 @@ async function addMessage(text) {
     const savedMessage = normalizeMessage(data.message);
     state.online = true;
     deliveryState.delete(optimisticMessage.id);
-    state.messages[state.activeDate] = [
-      ...state.messages[state.activeDate].filter((message) => message.id !== optimisticMessage.id),
-      savedMessage,
-    ];
+    state.messages = state.messages.filter((message) => message.id !== optimisticMessage.id);
+    mergeMessages([savedMessage]);
   } catch {
     state.online = false;
     deliveryState.set(optimisticMessage.id, "Not sent");
   } finally {
-    render();
+    render({ scroll: "bottom" });
     keepComposerFocused();
   }
 }
@@ -956,9 +1016,15 @@ async function addMessage(text) {
 function selectDate(dateKey) {
   state.activeDate = dateKey;
   closeCalendar();
-  renderedMessageIds.clear();
   render();
-  fetchMessages({ showLoading: true });
+  const dayMarker = messagesEl.querySelector(`[data-date="${dateKey}"]`);
+  if (dayMarker) {
+    dayMarker.scrollIntoView({ block: "start" });
+  } else if (dateKey === getLocalDateKey()) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  } else {
+    fetchMessages({ older: true });
+  }
 }
 
 function openCalendar() {
@@ -969,6 +1035,14 @@ function openCalendar() {
 function closeCalendar() {
   calendarPanel.classList.remove("open");
   calendarScrim.hidden = true;
+}
+
+function loadOlderMessagesIfNeeded() {
+  if (messagesEl.scrollTop > 24 || state.loading || state.loadingOlder || !state.hasMoreMessages) {
+    return;
+  }
+
+  fetchMessages({ older: true });
 }
 
 function keepComposerFocused() {
@@ -984,10 +1058,9 @@ function resizeInput() {
 }
 
 function renderComposerState() {
-  const locked = !isTodayActive();
-  messageInput.disabled = locked;
-  messageInput.placeholder = locked ? "This day is locked" : "Write a message...";
-  sendButton.disabled = locked || !state.profileName || cleanMessageText(messageInput.value).length === 0;
+  messageInput.disabled = false;
+  messageInput.placeholder = "Write a message...";
+  sendButton.disabled = !state.profileName || cleanMessageText(messageInput.value).length === 0;
 }
 
 function openProfileDialog({ required = false } = {}) {
@@ -1049,6 +1122,7 @@ messageInput.addEventListener("keydown", (event) => {
   }
 });
 
+messagesEl.addEventListener("scroll", loadOlderMessagesIfNeeded, { passive: true });
 notifyButton.addEventListener("click", requestNotifications);
 menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
