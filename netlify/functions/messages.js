@@ -5,7 +5,7 @@ const allowedRooms = new Set(["General"]);
 const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
   "Content-Type": "application/json",
 };
 
@@ -63,10 +63,21 @@ async function ensureSchema(db) {
     `;
     await db`CREATE INDEX IF NOT EXISTS messages_room_created_at_idx ON messages (room, created_at DESC)`;
     await db`ALTER TABLE messages ADD COLUMN IF NOT EXISTS chat_date DATE`;
+    await db`ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ`;
     await db`UPDATE messages SET chat_date = (created_at AT TIME ZONE 'Europe/Athens')::date WHERE chat_date IS NULL`;
     await db`ALTER TABLE messages ALTER COLUMN chat_date SET DEFAULT CURRENT_DATE`;
     await db`ALTER TABLE messages ALTER COLUMN chat_date SET NOT NULL`;
     await db`CREATE INDEX IF NOT EXISTS messages_room_chat_date_created_at_idx ON messages (room, chat_date, created_at ASC)`;
+    await db`
+      CREATE TABLE IF NOT EXISTS message_edits (
+        id BIGSERIAL PRIMARY KEY,
+        message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        old_text TEXT NOT NULL,
+        new_text TEXT NOT NULL,
+        edited_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await db`CREATE INDEX IF NOT EXISTS message_edits_message_id_idx ON message_edits (message_id, edited_at ASC)`;
     await db`
       CREATE TABLE IF NOT EXISTS message_reads (
         message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -129,13 +140,24 @@ exports.handler = async (event) => {
         m.text,
         m.chat_date,
         m.created_at,
+        m.edited_at,
         COALESCE(
-          ARRAY_AGG(r.viewer ORDER BY r.seen_at)
+          ARRAY_AGG(DISTINCT r.viewer)
             FILTER (WHERE r.viewer IS NOT NULL AND r.viewer <> m.author),
           ARRAY[]::TEXT[]
-        ) AS seen_by
+        ) AS seen_by,
+        COALESCE(
+          JSONB_AGG(
+            DISTINCT JSONB_BUILD_OBJECT(
+              'oldText', e.old_text,
+              'newText', e.new_text,
+              'editedAt', e.edited_at
+            )
+          ) FILTER (WHERE e.id IS NOT NULL),
+          '[]'::JSONB
+        ) AS edit_history
       FROM (
-        SELECT id, room, author, text, chat_date, created_at
+        SELECT id, room, author, text, chat_date, created_at, edited_at
         FROM messages
         WHERE room = ${room}
           AND chat_date = ${chatDate}::date
@@ -143,7 +165,8 @@ exports.handler = async (event) => {
         LIMIT 100
       ) m
       LEFT JOIN message_reads r ON r.message_id = m.id
-      GROUP BY m.id, m.room, m.author, m.text, m.chat_date, m.created_at
+      LEFT JOIN message_edits e ON e.message_id = m.id
+      GROUP BY m.id, m.room, m.author, m.text, m.chat_date, m.created_at, m.edited_at
       ORDER BY m.created_at ASC
     `;
 
@@ -159,6 +182,8 @@ exports.handler = async (event) => {
         text: row.text,
         chatDate: row.chat_date,
         createdAt: row.created_at,
+        editedAt: row.edited_at,
+        editHistory: row.edit_history,
         seenBy: row.seen_by,
       })),
     });
@@ -195,9 +220,101 @@ exports.handler = async (event) => {
         author: message.author,
         text: message.text,
         createdAt: message.created_at,
+        editedAt: null,
+        editHistory: [],
         seenBy: [],
       },
     });
+  }
+
+  if (event.httpMethod === "PUT") {
+    let payload;
+    try {
+      payload = JSON.parse(event.body || "{}");
+    } catch {
+      return json(400, { error: "Invalid JSON body" });
+    }
+
+    const id = Number(payload.id);
+    const room = cleanRoom(payload.room);
+    const author = cleanText(payload.author, 24);
+    const text = cleanText(payload.text, 1000);
+
+    if (!Number.isSafeInteger(id) || id <= 0 || !author || !text) {
+      return json(400, { error: "Invalid edit request" });
+    }
+
+    const [existing] = await db`
+      SELECT id, text
+      FROM messages
+      WHERE id = ${id}
+        AND room = ${room}
+        AND author = ${author}
+        AND chat_date = (NOW() AT TIME ZONE 'Europe/Athens')::date
+      LIMIT 1
+    `;
+
+    if (!existing) {
+      return json(403, { error: "Message cannot be edited" });
+    }
+
+    if (existing.text !== text) {
+      await db`
+        INSERT INTO message_edits (message_id, old_text, new_text)
+        VALUES (${id}, ${existing.text}, ${text})
+      `;
+    }
+
+    const [message] = await db`
+      UPDATE messages
+      SET text = ${text}, edited_at = CASE WHEN text <> ${text} THEN NOW() ELSE edited_at END
+      WHERE id = ${id}
+      RETURNING id, room, chat_date, author, text, created_at, edited_at
+    `;
+
+    return json(200, {
+      message: {
+        id: message.id,
+        room: message.room,
+        chatDate: message.chat_date,
+        author: message.author,
+        text: message.text,
+        createdAt: message.created_at,
+        editedAt: message.edited_at,
+      },
+    });
+  }
+
+  if (event.httpMethod === "DELETE") {
+    let payload;
+    try {
+      payload = JSON.parse(event.body || "{}");
+    } catch {
+      return json(400, { error: "Invalid JSON body" });
+    }
+
+    const id = Number(payload.id);
+    const room = cleanRoom(payload.room);
+    const author = cleanText(payload.author, 24);
+
+    if (!Number.isSafeInteger(id) || id <= 0 || !author) {
+      return json(400, { error: "Invalid delete request" });
+    }
+
+    const rows = await db`
+      DELETE FROM messages
+      WHERE id = ${id}
+        AND room = ${room}
+        AND author = ${author}
+        AND chat_date = (NOW() AT TIME ZONE 'Europe/Athens')::date
+      RETURNING id
+    `;
+
+    if (rows.length === 0) {
+      return json(403, { error: "Message cannot be deleted" });
+    }
+
+    return json(200, { deleted: true });
   }
 
   return json(405, { error: "Method not allowed" });

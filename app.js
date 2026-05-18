@@ -60,6 +60,18 @@ const calendarPanel = document.querySelector("#calendarPanel");
 const calendarScrim = document.querySelector("#calendarScrim");
 const dayList = document.querySelector("#dayList");
 const todayButton = document.querySelector("#todayButton");
+const messageMenu = document.querySelector("#messageMenu");
+const copyMessageButton = document.querySelector("#copyMessageButton");
+const editMessageButton = document.querySelector("#editMessageButton");
+const deleteMessageButton = document.querySelector("#deleteMessageButton");
+const editDialog = document.querySelector("#editDialog");
+const editForm = document.querySelector("#editForm");
+const editInput = document.querySelector("#editInput");
+const cancelEditButton = document.querySelector("#cancelEditButton");
+const historyDialog = document.querySelector("#historyDialog");
+const historyList = document.querySelector("#historyList");
+let selectedMessage = null;
+let longPressTimer = null;
 
 function loadProfileName() {
   const saved = readStoredProfileName();
@@ -160,8 +172,22 @@ function normalizeMessage(message) {
     text: cleanMessageText(message.text),
     createdAt: message.createdAt || message.created_at,
     chatDate: normalizeDateKey(message.chatDate || message.chat_date || state.activeDate),
+    editedAt: message.editedAt || message.edited_at || null,
+    editHistory: normalizeEditHistory(message.editHistory || message.edit_history || []),
     seenBy: message.seenBy || message.seen_by || [],
   };
+}
+
+function normalizeEditHistory(history) {
+  if (!Array.isArray(history)) {
+    return [];
+  }
+
+  return history.map((entry) => ({
+    oldText: cleanMessageText(entry.oldText || entry.old_text),
+    newText: cleanMessageText(entry.newText || entry.new_text),
+    editedAt: entry.editedAt || entry.edited_at,
+  }));
 }
 
 function cleanMessageText(value) {
@@ -245,8 +271,18 @@ function renderMessages() {
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     bubble.textContent = message.text;
+    attachMessageActions(bubble, message);
 
     item.append(bubble);
+
+    if (message.editedAt) {
+      const edited = document.createElement("button");
+      edited.type = "button";
+      edited.className = "edited-label";
+      edited.textContent = "edited";
+      edited.addEventListener("click", () => showEditHistory(message));
+      item.append(edited);
+    }
 
     if (isMine && isLatestOwn) {
       const delivery = document.createElement("div");
@@ -262,6 +298,30 @@ function renderMessages() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+function attachMessageActions(element, message) {
+  element.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    window.clearTimeout(longPressTimer);
+    longPressTimer = window.setTimeout(() => {
+      showMessageMenu(message, event.clientX, event.clientY);
+    }, 520);
+  });
+
+  element.addEventListener("pointerup", () => window.clearTimeout(longPressTimer));
+  element.addEventListener("pointercancel", () => window.clearTimeout(longPressTimer));
+  element.addEventListener("pointerleave", () => window.clearTimeout(longPressTimer));
+  element.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    showMessageMenu(message, event.clientX, event.clientY);
+  });
+  element.addEventListener("dblclick", (event) => {
+    showMessageMenu(message, event.clientX, event.clientY);
+  });
+}
+
 function isGroupedMessage(firstMessage, secondMessage) {
   if (!firstMessage || !secondMessage || firstMessage.author !== secondMessage.author) {
     return false;
@@ -275,8 +335,10 @@ function isGroupedMessage(firstMessage, secondMessage) {
 }
 
 function render() {
+  closeMessageMenu();
   renderHeader();
   renderMessages();
+  renderComposerState();
 }
 
 function renderCalendar() {
@@ -385,6 +447,172 @@ function showToast(message) {
   }, 2600);
 }
 
+function isTodayActive() {
+  return state.activeDate === getLocalDateKey();
+}
+
+function canModifyMessage(message) {
+  return Boolean(
+    message &&
+      isTodayActive() &&
+      message.author === state.profileName &&
+      /^\d+$/.test(message.id)
+  );
+}
+
+function showMessageMenu(message, x, y) {
+  selectedMessage = message;
+  const canModify = canModifyMessage(message);
+  editMessageButton.hidden = !canModify;
+  deleteMessageButton.hidden = !canModify;
+
+  messageMenu.hidden = false;
+  const rect = messageMenu.getBoundingClientRect();
+  const left = Math.min(Math.max(10, x - rect.width / 2), window.innerWidth - rect.width - 10);
+  const top = Math.min(Math.max(10, y - rect.height - 12), window.innerHeight - rect.height - 10);
+
+  messageMenu.style.left = `${left}px`;
+  messageMenu.style.top = `${top}px`;
+}
+
+function closeMessageMenu() {
+  messageMenu.hidden = true;
+}
+
+async function copySelectedMessage() {
+  if (!selectedMessage) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(selectedMessage.text);
+    showToast("Copied.");
+  } catch {
+    showToast("Copy failed.");
+  } finally {
+    closeMessageMenu();
+  }
+}
+
+function openEditDialog() {
+  if (!canModifyMessage(selectedMessage)) {
+    closeMessageMenu();
+    return;
+  }
+
+  editInput.value = selectedMessage.text;
+  closeMessageMenu();
+  editDialog.showModal();
+  editInput.focus();
+}
+
+async function saveEditedMessage() {
+  if (!canModifyMessage(selectedMessage)) {
+    return;
+  }
+
+  const text = cleanMessageText(editInput.value);
+  if (!text || text === selectedMessage.text) {
+    editDialog.close();
+    return;
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: selectedMessage.id,
+        room: state.activeRoom,
+        author: state.profileName,
+        text,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Edit failed");
+    }
+
+    editDialog.close();
+    await fetchMessages();
+  } catch {
+    showToast("Could not edit message.");
+  }
+}
+
+async function deleteSelectedMessage() {
+  if (!canModifyMessage(selectedMessage)) {
+    closeMessageMenu();
+    return;
+  }
+
+  const confirmed = window.confirm("Delete this message?");
+  closeMessageMenu();
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: selectedMessage.id,
+        room: state.activeRoom,
+        author: state.profileName,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Delete failed");
+    }
+
+    state.messages[state.activeDate] = state.messages[state.activeDate].filter(
+      (message) => message.id !== selectedMessage.id
+    );
+    selectedMessage = null;
+    render();
+    fetchMessages();
+  } catch {
+    showToast("Could not delete message.");
+  }
+}
+
+function showEditHistory(message) {
+  historyList.replaceChildren();
+
+  if (!message.editHistory.length) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = "No previous text saved.";
+    historyList.append(empty);
+  }
+
+  message.editHistory.forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "history-item";
+
+    const time = document.createElement("small");
+    time.textContent = `Edited ${formatTime(entry.editedAt)}`;
+
+    const oldText = document.createElement("p");
+    oldText.textContent = entry.oldText;
+
+    const newText = document.createElement("p");
+    newText.className = "history-new";
+    newText.textContent = entry.newText;
+
+    item.append(time, oldText, newText);
+    historyList.append(item);
+  });
+
+  historyDialog.showModal();
+}
+
 async function requestNotifications() {
   if (!("Notification" in window)) {
     showToast("Notifications are not supported on this browser.");
@@ -435,6 +663,11 @@ function showIncomingNotification(message) {
 }
 
 async function addMessage(text) {
+  if (!isTodayActive()) {
+    showToast("Past days are locked.");
+    return;
+  }
+
   if (!state.profileName) {
     openProfileDialog({ required: true });
     return;
@@ -526,7 +759,14 @@ function keepComposerFocused() {
 function resizeInput() {
   messageInput.style.height = "auto";
   messageInput.style.height = `${messageInput.scrollHeight}px`;
-  sendButton.disabled = !state.profileName || messageInput.value.trim().length === 0;
+  renderComposerState();
+}
+
+function renderComposerState() {
+  const locked = !isTodayActive();
+  messageInput.disabled = locked;
+  messageInput.placeholder = locked ? "This day is locked" : "Write a message...";
+  sendButton.disabled = locked || !state.profileName || cleanMessageText(messageInput.value).length === 0;
 }
 
 function openProfileDialog({ required = false } = {}) {
@@ -590,6 +830,19 @@ menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
 calendarScrim.addEventListener("click", closeCalendar);
 todayButton.addEventListener("click", () => selectDate(getLocalDateKey()));
+copyMessageButton.addEventListener("click", copySelectedMessage);
+editMessageButton.addEventListener("click", openEditDialog);
+deleteMessageButton.addEventListener("click", deleteSelectedMessage);
+cancelEditButton.addEventListener("click", () => editDialog.close());
+editForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveEditedMessage();
+});
+document.addEventListener("pointerdown", (event) => {
+  if (!messageMenu.hidden && !messageMenu.contains(event.target)) {
+    closeMessageMenu();
+  }
+});
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
