@@ -31,6 +31,7 @@ const state = {
 const deliveryState = new Map();
 const renderedMessageIds = new Set();
 const knownRemoteMessageIds = new Set();
+const markedSeenMessageIds = new Set();
 let hasLoadedRemoteMessages = false;
 
 const messagesEl = document.querySelector("#messages");
@@ -72,7 +73,17 @@ function normalizeMessage(message) {
     author: message.author,
     text: message.text,
     createdAt: message.createdAt || message.created_at,
+    seenBy: message.seenBy || message.seen_by || [],
   };
+}
+
+function getDeliveryStatus(message) {
+  const localStatus = deliveryState.get(message.id);
+  if (localStatus) {
+    return localStatus;
+  }
+
+  return message.seenBy.length > 0 ? "Seen" : "Sent";
 }
 
 function renderHeader() {
@@ -133,7 +144,7 @@ function renderMessages() {
     if (isMine && isLatestOwn) {
       const delivery = document.createElement("div");
       delivery.className = "delivery-status";
-      delivery.textContent = deliveryState.get(message.id) || "Seen";
+      delivery.textContent = getDeliveryStatus(message);
       item.append(delivery);
     }
 
@@ -176,11 +187,51 @@ async function fetchMessages({ showLoading = false } = {}) {
     state.online = true;
 
     newIncomingMessages.forEach(showIncomingNotification);
+    markMessagesSeen(nextMessages);
   } catch {
     state.online = false;
   } finally {
     state.loading = false;
     render();
+  }
+}
+
+async function markMessagesSeen(messages) {
+  if (!state.profileName) {
+    return;
+  }
+
+  const messageIds = messages
+    .filter(
+      (message) =>
+        message.author !== state.profileName &&
+        /^\d+$/.test(message.id) &&
+        !markedSeenMessageIds.has(message.id)
+    )
+    .map((message) => message.id);
+
+  if (messageIds.length === 0) {
+    return;
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        room: state.activeRoom,
+        viewer: state.profileName,
+        messageIds,
+      }),
+    });
+
+    if (response.ok) {
+      messageIds.forEach((id) => markedSeenMessageIds.add(id));
+    }
+  } catch {
+    // Read receipts are best-effort; sending and loading messages should keep working.
   }
 }
 
@@ -288,7 +339,6 @@ async function addMessage(text) {
     const savedMessage = normalizeMessage(data.message);
     state.online = true;
     deliveryState.delete(optimisticMessage.id);
-    deliveryState.set(savedMessage.id, "Seen");
     state.messages[state.activeRoom] = [
       ...state.messages[state.activeRoom].filter((message) => message.id !== optimisticMessage.id),
       savedMessage,

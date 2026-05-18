@@ -5,7 +5,7 @@ const allowedRooms = new Set(["General"]);
 const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
   "Content-Type": "application/json",
 };
 
@@ -38,17 +38,27 @@ function cleanText(value, maxLength) {
 }
 
 async function ensureSchema(db) {
-  schemaReady ??= db`
-    CREATE TABLE IF NOT EXISTS messages (
-      id BIGSERIAL PRIMARY KEY,
-      room TEXT NOT NULL,
-      author TEXT NOT NULL,
-      text TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `.then(
-    () => db`CREATE INDEX IF NOT EXISTS messages_room_created_at_idx ON messages (room, created_at DESC)`
-  );
+  schemaReady ??= (async () => {
+    await db`
+      CREATE TABLE IF NOT EXISTS messages (
+        id BIGSERIAL PRIMARY KEY,
+        room TEXT NOT NULL,
+        author TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await db`CREATE INDEX IF NOT EXISTS messages_room_created_at_idx ON messages (room, created_at DESC)`;
+    await db`
+      CREATE TABLE IF NOT EXISTS message_reads (
+        message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        viewer TEXT NOT NULL,
+        seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (message_id, viewer)
+      )
+    `;
+    await db`CREATE INDEX IF NOT EXISTS message_reads_viewer_idx ON message_reads (viewer)`;
+  })();
 
   return schemaReady;
 }
@@ -69,11 +79,27 @@ exports.handler = async (event) => {
   if (event.httpMethod === "GET") {
     const room = cleanRoom(event.queryStringParameters?.room);
     const rows = await db`
-      SELECT id, room, author, text, created_at
-      FROM messages
-      WHERE room = ${room}
-      ORDER BY created_at ASC
-      LIMIT 100
+      SELECT
+        m.id,
+        m.room,
+        m.author,
+        m.text,
+        m.created_at,
+        COALESCE(
+          ARRAY_AGG(r.viewer ORDER BY r.seen_at)
+            FILTER (WHERE r.viewer IS NOT NULL AND r.viewer <> m.author),
+          ARRAY[]::TEXT[]
+        ) AS seen_by
+      FROM (
+        SELECT id, room, author, text, created_at
+        FROM messages
+        WHERE room = ${room}
+        ORDER BY created_at DESC
+        LIMIT 100
+      ) m
+      LEFT JOIN message_reads r ON r.message_id = m.id
+      GROUP BY m.id, m.room, m.author, m.text, m.created_at
+      ORDER BY m.created_at ASC
     `;
 
     return json(200, {
@@ -83,6 +109,7 @@ exports.handler = async (event) => {
         author: row.author,
         text: row.text,
         createdAt: row.created_at,
+        seenBy: row.seen_by,
       })),
     });
   }
@@ -116,8 +143,45 @@ exports.handler = async (event) => {
         author: message.author,
         text: message.text,
         createdAt: message.created_at,
+        seenBy: [],
       },
     });
+  }
+
+  if (event.httpMethod === "PATCH") {
+    let payload;
+    try {
+      payload = JSON.parse(event.body || "{}");
+    } catch {
+      return json(400, { error: "Invalid JSON body" });
+    }
+
+    const room = cleanRoom(payload.room);
+    const viewer = cleanText(payload.viewer, 24);
+    const messageIds = Array.isArray(payload.messageIds)
+      ? payload.messageIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isSafeInteger(id) && id > 0)
+          .slice(0, 100)
+      : [];
+
+    if (!viewer || messageIds.length === 0) {
+      return json(200, { saved: 0 });
+    }
+
+    const rows = await db`
+      INSERT INTO message_reads (message_id, viewer)
+      SELECT id, ${viewer}
+      FROM messages
+      WHERE room = ${room}
+        AND author <> ${viewer}
+        AND id = ANY(${messageIds}::bigint[])
+      ON CONFLICT (message_id, viewer)
+      DO UPDATE SET seen_at = NOW()
+      RETURNING message_id
+    `;
+
+    return json(200, { saved: rows.length });
   }
 
   return json(405, { error: "Method not allowed" });
