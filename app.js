@@ -36,7 +36,6 @@ const profileDialog = document.querySelector("#profileDialog");
 const profileForm = document.querySelector("#profileForm");
 const nameInput = document.querySelector("#nameInput");
 const sendButton = document.querySelector(".send-button");
-const statusText = document.querySelector("#statusText");
 const profileTitle = document.querySelector("#profileTitle");
 const profileHelp = document.querySelector("#profileHelp");
 const cancelProfileButton = document.querySelector("#cancelProfileButton");
@@ -71,7 +70,6 @@ function normalizeMessage(message) {
 function renderHeader() {
   activeRoomEl.textContent = state.activeRoom;
   avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "?";
-  statusText.textContent = state.online ? "database connected" : "local preview";
 }
 
 function renderMessages() {

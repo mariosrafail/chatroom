@@ -89,20 +89,6 @@ button {
   white-space: nowrap;
 }
 
-.room-title small {
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 5px;
-  border-radius: 50%;
-  background: #20b486;
-}
-
 .icon-button,
 .avatar-button,
 .send-button {
