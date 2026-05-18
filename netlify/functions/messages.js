@@ -1,6 +1,6 @@
 const { neon } = require("@neondatabase/serverless");
 
-const allowedRooms = new Set(["General", "Random", "Support"]);
+const allowedRooms = new Set(["General"]);
 
 const headers = {
   "Access-Control-Allow-Origin": "*",

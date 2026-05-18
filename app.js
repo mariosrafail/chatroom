@@ -1,4 +1,4 @@
-const storageKey = "mobile-chat-room-profile";
+const storageKey = "mobile-chat-room-profile-v2";
 const apiUrl = "/.netlify/functions/messages";
 const pollMs = 3000;
 
@@ -17,22 +17,6 @@ const fallbackMessages = {
       createdAt: Date.now() - 1000 * 60 * 7,
     },
   ],
-  Random: [
-    {
-      id: "local-3",
-      author: "Alex",
-      text: "Random updates can go here.",
-      createdAt: Date.now() - 1000 * 60 * 18,
-    },
-  ],
-  Support: [
-    {
-      id: "local-4",
-      author: "Support",
-      text: "Send a message and we will check it.",
-      createdAt: Date.now() - 1000 * 60 * 22,
-    },
-  ],
 };
 
 const state = {
@@ -48,16 +32,20 @@ const messageForm = document.querySelector("#messageForm");
 const messageInput = document.querySelector("#messageInput");
 const activeRoomEl = document.querySelector("#activeRoom");
 const avatarInitial = document.querySelector("#avatarInitial");
-const roomsPanel = document.querySelector("#roomsPanel");
 const profileDialog = document.querySelector("#profileDialog");
 const profileForm = document.querySelector("#profileForm");
 const nameInput = document.querySelector("#nameInput");
 const sendButton = document.querySelector(".send-button");
 const statusText = document.querySelector("#statusText");
+const profileTitle = document.querySelector("#profileTitle");
+const profileHelp = document.querySelector("#profileHelp");
+const cancelProfileButton = document.querySelector("#cancelProfileButton");
+const saveProfileButton = document.querySelector("#saveProfileButton");
+const dialogActions = document.querySelector(".dialog-actions");
 
 function loadProfileName() {
   const saved = localStorage.getItem(storageKey);
-  return saved || "Marios";
+  return saved || "";
 }
 
 function saveProfileName() {
@@ -82,12 +70,8 @@ function normalizeMessage(message) {
 
 function renderHeader() {
   activeRoomEl.textContent = state.activeRoom;
-  avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "U";
+  avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "?";
   statusText.textContent = state.online ? "database connected" : "local preview";
-
-  document.querySelectorAll(".room-option").forEach((button) => {
-    button.classList.toggle("active", button.dataset.room === state.activeRoom);
-  });
 }
 
 function renderMessages() {
@@ -158,6 +142,11 @@ async function fetchMessages({ showLoading = false } = {}) {
 }
 
 async function addMessage(text) {
+  if (!state.profileName) {
+    openProfileDialog({ required: true });
+    return;
+  }
+
   const cleanText = text.trim();
   if (!cleanText) {
     return;
@@ -209,33 +198,34 @@ async function addMessage(text) {
 function resizeInput() {
   messageInput.style.height = "auto";
   messageInput.style.height = `${messageInput.scrollHeight}px`;
-  sendButton.disabled = messageInput.value.trim().length === 0;
+  sendButton.disabled = !state.profileName || messageInput.value.trim().length === 0;
 }
 
-document.querySelector("#menuButton").addEventListener("click", () => {
-  roomsPanel.classList.add("open");
-});
-
-document.querySelector("#closeRoomsButton").addEventListener("click", () => {
-  roomsPanel.classList.remove("open");
-});
-
-document.querySelectorAll(".room-option").forEach((button) => {
-  button.addEventListener("click", () => {
-    state.activeRoom = button.dataset.room;
-    roomsPanel.classList.remove("open");
-    render();
-    fetchMessages({ showLoading: true });
-  });
-});
-
-document.querySelector("#profileButton").addEventListener("click", () => {
+function openProfileDialog({ required = false } = {}) {
+  profileTitle.textContent = required ? "Enter name" : "Profile";
+  profileHelp.textContent = required
+    ? "Choose a name before you start chatting."
+    : "Your name appears next to messages sent from this device.";
+  saveProfileButton.textContent = required ? "Start" : "Save";
+  cancelProfileButton.hidden = required;
+  dialogActions.classList.toggle("single-action", required);
   nameInput.value = state.profileName;
   profileDialog.showModal();
+  nameInput.focus();
+}
+
+document.querySelector("#profileButton").addEventListener("click", () => {
+  openProfileDialog({ required: false });
 });
 
 document.querySelector("#cancelProfileButton").addEventListener("click", () => {
   profileDialog.close();
+});
+
+profileDialog.addEventListener("cancel", (event) => {
+  if (!state.profileName) {
+    event.preventDefault();
+  }
 });
 
 profileForm.addEventListener("submit", (event) => {
@@ -245,6 +235,7 @@ profileForm.addEventListener("submit", (event) => {
   saveProfileName();
   profileDialog.close();
   render();
+  resizeInput();
 });
 
 messageForm.addEventListener("submit", (event) => {
@@ -265,16 +256,11 @@ document.querySelector("#quickButton").addEventListener("click", () => {
   addMessage("Got it, moving on.");
 });
 
-document.addEventListener("click", (event) => {
-  const clickedInsidePanel = roomsPanel.contains(event.target);
-  const clickedMenu = event.target.closest("#menuButton");
-
-  if (!clickedInsidePanel && !clickedMenu) {
-    roomsPanel.classList.remove("open");
-  }
-});
-
 resizeInput();
 render();
 fetchMessages({ showLoading: true });
 setInterval(() => fetchMessages(), pollMs);
+
+if (!state.profileName) {
+  openProfileDialog({ required: true });
+}

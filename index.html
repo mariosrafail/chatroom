@@ -10,11 +10,7 @@
     <main class="app-shell">
       <section class="chat-app" aria-label="Chat room">
         <header class="topbar">
-          <button class="icon-button" id="menuButton" aria-label="Rooms">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+          <div class="topbar-spacer" aria-hidden="true"></div>
           <div class="room-title">
             <span id="activeRoom">General</span>
             <small><span class="status-dot"></span><span id="statusText">local preview</span></small>
@@ -23,29 +19,6 @@
             <span id="avatarInitial">M</span>
           </button>
         </header>
-
-        <aside class="rooms-panel" id="roomsPanel" aria-label="Room list">
-          <div class="panel-head">
-            <strong>Rooms</strong>
-            <button class="icon-button compact" id="closeRoomsButton" aria-label="Close">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <button class="room-option active" data-room="General">
-            <span># General</span>
-            <small>all updates</small>
-          </button>
-          <button class="room-option" data-room="Random">
-            <span># Random</span>
-            <small>casual chat</small>
-          </button>
-          <button class="room-option" data-room="Support">
-            <span># Support</span>
-            <small>help desk</small>
-          </button>
-        </aside>
 
         <section class="messages" id="messages" aria-live="polite"></section>
 
@@ -70,8 +43,8 @@
     <dialog class="profile-dialog" id="profileDialog">
       <form method="dialog" class="profile-card" id="profileForm">
         <div>
-          <h1>Profile</h1>
-          <p>Your name appears next to messages sent from this device.</p>
+          <h1 id="profileTitle">Enter name</h1>
+          <p id="profileHelp">Choose a name before you start chatting.</p>
         </div>
         <label>
           Name
@@ -79,7 +52,7 @@
         </label>
         <div class="dialog-actions">
           <button class="secondary-button" type="button" id="cancelProfileButton">Cancel</button>
-          <button class="primary-button" id="saveProfileButton" value="default">Save</button>
+          <button class="primary-button" id="saveProfileButton" value="default">Start</button>
         </div>
       </form>
     </dialog>

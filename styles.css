@@ -113,14 +113,14 @@ button {
   border-radius: 8px;
 }
 
+.topbar-spacer {
+  width: 44px;
+  height: 44px;
+}
+
 .icon-button {
   color: var(--text);
   background: var(--surface-strong);
-}
-
-.icon-button.compact {
-  width: 36px;
-  height: 36px;
 }
 
 .icon-button svg,
@@ -138,58 +138,6 @@ button {
   color: #083f37;
   background: color-mix(in srgb, var(--accent) 70%, white);
   font-weight: 800;
-}
-
-.rooms-panel {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: min(84vw, 340px);
-  padding: calc(18px + env(safe-area-inset-top)) 14px 18px;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-  box-shadow: var(--shadow);
-  transform: translateX(-105%);
-  transition: transform 180ms ease;
-  z-index: 5;
-  display: grid;
-  align-content: start;
-  gap: 10px;
-}
-
-.rooms-panel.open {
-  transform: translateX(0);
-}
-
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.room-option {
-  width: 100%;
-  min-height: 62px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  display: grid;
-  gap: 3px;
-  text-align: left;
-  color: var(--text);
-  background: transparent;
-}
-
-.room-option span {
-  font-weight: 750;
-}
-
-.room-option small {
-  color: var(--muted);
-}
-
-.room-option.active {
-  background: #e8f3f1;
-  color: var(--primary-dark);
 }
 
 .messages {
@@ -358,6 +306,10 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.dialog-actions.single-action {
+  grid-template-columns: 1fr;
 }
 
 .primary-button,
