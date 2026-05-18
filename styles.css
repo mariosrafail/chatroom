@@ -214,6 +214,19 @@ button {
   border: 1px solid var(--line);
 }
 
+.empty-state {
+  align-self: center;
+  max-width: 260px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.35;
+}
+
 .message {
   max-width: 86%;
   display: grid;
