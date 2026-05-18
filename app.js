@@ -26,6 +26,8 @@ const state = {
   loading: false,
   messages: structuredClone(fallbackMessages),
 };
+const deliveryState = new Map();
+const renderedMessageIds = new Set();
 
 const messagesEl = document.querySelector("#messages");
 const messageForm = document.querySelector("#messageForm");
@@ -74,6 +76,7 @@ function renderHeader() {
 
 function renderMessages() {
   const roomMessages = state.messages[state.activeRoom] ?? [];
+  const latestOwnMessage = [...roomMessages].reverse().find((message) => message.author === state.profileName);
   messagesEl.replaceChildren();
 
   const dayChip = document.createElement("div");
@@ -91,8 +94,12 @@ function renderMessages() {
 
   roomMessages.forEach((message) => {
     const isMine = message.author === state.profileName;
+    const isLatestOwn = latestOwnMessage?.id === message.id;
     const item = document.createElement("article");
     item.className = `message ${isMine ? "mine" : "theirs"}`;
+    if (!renderedMessageIds.has(message.id)) {
+      item.classList.add("new-message");
+    }
 
     const meta = document.createElement("div");
     meta.className = "message-meta";
@@ -105,7 +112,16 @@ function renderMessages() {
     bubble.textContent = message.text;
 
     item.append(meta, bubble);
+
+    if (isMine && isLatestOwn) {
+      const delivery = document.createElement("div");
+      delivery.className = "delivery-status";
+      delivery.textContent = deliveryState.get(message.id) || "Seen";
+      item.append(delivery);
+    }
+
     messagesEl.append(item);
+    renderedMessageIds.add(message.id);
   });
 
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -156,6 +172,7 @@ async function addMessage(text) {
     text: cleanText,
     createdAt: new Date().toISOString(),
   };
+  deliveryState.set(optimisticMessage.id, "Sent");
 
   messageInput.value = "";
   resizeInput();
@@ -181,13 +198,17 @@ async function addMessage(text) {
     }
 
     const data = await response.json();
+    const savedMessage = normalizeMessage(data.message);
     state.online = true;
+    deliveryState.delete(optimisticMessage.id);
+    deliveryState.set(savedMessage.id, "Seen");
     state.messages[state.activeRoom] = [
       ...state.messages[state.activeRoom].filter((message) => message.id !== optimisticMessage.id),
-      normalizeMessage(data.message),
+      savedMessage,
     ];
   } catch {
     state.online = false;
+    deliveryState.set(optimisticMessage.id, "Not sent");
   } finally {
     render();
   }
