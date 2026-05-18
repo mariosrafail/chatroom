@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SoulMate Chat icon">
+  <defs>
+    <linearGradient id="bg" x1="86" y1="64" x2="426" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff8ab3" />
+      <stop offset="0.44" stop-color="#ff2d70" />
+      <stop offset="1" stop-color="#7a5cff" />
+    </linearGradient>
+    <linearGradient id="bubble" x1="144" y1="128" x2="370" y2="356" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" />
+      <stop offset="1" stop-color="#fff1f7" />
+    </linearGradient>
+    <filter id="shadow" x="78" y="86" width="356" height="334" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#6b1740" flood-opacity="0.24" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <circle cx="132" cy="126" r="42" fill="#ffffff" opacity="0.18" />
+  <circle cx="410" cy="380" r="64" fill="#ffffff" opacity="0.1" />
+  <path
+    fill="url(#bubble)"
+    filter="url(#shadow)"
+    d="M118 238c0-74 63-126 148-126s148 52 148 126-63 126-148 126c-19 0-38-3-54-8l-67 39c-15 9-31-7-23-22l27-50c-20-22-31-51-31-85Z"
+  />
+  <path
+    fill="#ff2d70"
+    d="M256 300c-7-6-70-46-70-91 0-28 21-48 48-48 17 0 32 8 42 22 10-14 25-22 42-22 27 0 48 20 48 48 0 45-63 85-70 91-12 9-28 9-40 0Z"
+  />
+  <circle cx="190" cy="216" r="11" fill="#ffd6e5" />
+  <circle cx="322" cy="216" r="11" fill="#ffd6e5" />
+</svg>

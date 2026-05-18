@@ -1,5 +1,6 @@
 const storageKey = "mobile-chat-room-profile-v2";
 const apiUrl = "/.netlify/functions/messages";
+const appName = "SoulMate Chat";
 const pollMs = 3000;
 
 const fallbackMessages = {
@@ -70,7 +71,7 @@ function normalizeMessage(message) {
 }
 
 function renderHeader() {
-  activeRoomEl.textContent = state.activeRoom;
+  activeRoomEl.textContent = appName;
   avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "?";
 }
 
