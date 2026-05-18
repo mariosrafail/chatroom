@@ -119,6 +119,14 @@ button {
   stroke-linejoin: round;
 }
 
+.notify-button {
+  justify-self: start;
+}
+
+.notify-button.blocked {
+  color: var(--muted);
+}
+
 .avatar-button {
   color: #ffffff;
   background:
@@ -367,6 +375,27 @@ button {
   background: var(--surface-strong);
 }
 
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  z-index: 10;
+  max-width: min(340px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(20, 20, 24, 0.88);
+  color: #ffffff;
+  font-size: 0.86rem;
+  text-align: center;
+  transform: translateX(-50%);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
+  animation: toastIn 160ms ease-out both;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
 @keyframes messageIn {
   from {
     opacity: 0;
@@ -388,6 +417,18 @@ button {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
   }
 }
 

@@ -2,6 +2,7 @@ const storageKey = "mobile-chat-room-profile-v2";
 const apiUrl = "/.netlify/functions/messages";
 const appName = "SoulMate Chat";
 const pollMs = 3000;
+const notificationIcon = "/icons/icon-192.png";
 
 const fallbackMessages = {
   General: [
@@ -29,6 +30,8 @@ const state = {
 };
 const deliveryState = new Map();
 const renderedMessageIds = new Set();
+const knownRemoteMessageIds = new Set();
+let hasLoadedRemoteMessages = false;
 
 const messagesEl = document.querySelector("#messages");
 const messageForm = document.querySelector("#messageForm");
@@ -44,6 +47,8 @@ const profileHelp = document.querySelector("#profileHelp");
 const cancelProfileButton = document.querySelector("#cancelProfileButton");
 const saveProfileButton = document.querySelector("#saveProfileButton");
 const dialogActions = document.querySelector(".dialog-actions");
+const notifyButton = document.querySelector("#notifyButton");
+const notifyToast = document.querySelector("#notifyToast");
 
 function loadProfileName() {
   const saved = localStorage.getItem(storageKey);
@@ -73,6 +78,17 @@ function normalizeMessage(message) {
 function renderHeader() {
   activeRoomEl.textContent = appName;
   avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "?";
+  renderNotificationButton();
+}
+
+function renderNotificationButton() {
+  if (!("Notification" in window)) {
+    notifyButton.hidden = true;
+    return;
+  }
+
+  notifyButton.hidden = Notification.permission === "granted";
+  notifyButton.classList.toggle("blocked", Notification.permission === "denied");
 }
 
 function renderMessages() {
@@ -146,13 +162,83 @@ async function fetchMessages({ showLoading = false } = {}) {
     }
 
     const data = await response.json();
-    state.messages[state.activeRoom] = data.messages.map(normalizeMessage);
+    const nextMessages = data.messages.map(normalizeMessage);
+    const newIncomingMessages = nextMessages.filter(
+      (message) =>
+        hasLoadedRemoteMessages &&
+        !knownRemoteMessageIds.has(message.id) &&
+        message.author !== state.profileName
+    );
+
+    state.messages[state.activeRoom] = nextMessages;
+    nextMessages.forEach((message) => knownRemoteMessageIds.add(message.id));
+    hasLoadedRemoteMessages = true;
     state.online = true;
+
+    newIncomingMessages.forEach(showIncomingNotification);
   } catch {
     state.online = false;
   } finally {
     state.loading = false;
     render();
+  }
+}
+
+function showToast(message) {
+  notifyToast.textContent = message;
+  notifyToast.hidden = false;
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => {
+    notifyToast.hidden = true;
+  }, 2600);
+}
+
+async function requestNotifications() {
+  if (!("Notification" in window)) {
+    showToast("Notifications are not supported on this browser.");
+    return;
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+    renderNotificationButton();
+
+    if (permission === "granted") {
+      showToast("Notifications enabled.");
+      showIncomingNotification({
+        author: appName,
+        text: "You will get alerts for new messages while the app is running.",
+      });
+      return;
+    }
+
+    showToast("Notifications were not enabled.");
+  } catch {
+    showToast("Could not enable notifications.");
+  }
+}
+
+function showIncomingNotification(message) {
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    return;
+  }
+
+  const title = message.author === appName ? appName : `${message.author} sent a message`;
+  const notification = new Notification(title, {
+    body: message.text,
+    icon: notificationIcon,
+    badge: notificationIcon,
+    tag: `soulmate-${message.id || Date.now()}`,
+    renotify: true,
+  });
+
+  notification.onclick = () => {
+    window.focus();
+    notification.close();
+  };
+
+  if ("vibrate" in navigator) {
+    navigator.vibrate([40, 40, 40]);
   }
 }
 
@@ -275,6 +361,12 @@ messageInput.addEventListener("keydown", (event) => {
 document.querySelector("#quickButton").addEventListener("click", () => {
   addMessage("Got it, moving on.");
 });
+
+notifyButton.addEventListener("click", requestNotifications);
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
 
 resizeInput();
 render();

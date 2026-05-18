@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "check": "node --check app.js && node --check netlify/functions/messages.js"
+    "check": "node --check app.js && node --check netlify/functions/messages.js && node --check sw.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4"
