@@ -20,6 +20,7 @@
   --menu-surface: rgba(248, 248, 248, 0.94);
   --romance-day-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='260' viewBox='0 0 220 260'%3E%3Cpath d='M38 42c0-13 15-17 23-6 8-11 23-7 23 6 0 17-23 31-23 31S38 59 38 42Z' fill='none' stroke='%23ff2d70' stroke-opacity='.16' stroke-width='2.4'/%3E%3Cpath d='M142 151c0-10 12-13 18-5 6-8 18-5 18 5 0 13-18 24-18 24s-18-11-18-24Z' fill='none' stroke='%23ff5b8a' stroke-opacity='.13' stroke-width='2'/%3E%3Cellipse cx='171' cy='52' rx='6' ry='17' fill='%23ff6f91' fill-opacity='.13' transform='rotate(34 171 52)'/%3E%3Cellipse cx='92' cy='191' rx='5' ry='15' fill='%23ff2d70' fill-opacity='.1' transform='rotate(-28 92 191)'/%3E%3Cellipse cx='28' cy='141' rx='4' ry='13' fill='%23d6336c' fill-opacity='.09' transform='rotate(58 28 141)'/%3E%3C/svg%3E");
   --romance-night-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='260' viewBox='0 0 220 260'%3E%3Cpath d='M38 42c0-13 15-17 23-6 8-11 23-7 23 6 0 17-23 31-23 31S38 59 38 42Z' fill='none' stroke='%23ffd1df' stroke-opacity='.13' stroke-width='2.4'/%3E%3Cpath d='M142 151c0-10 12-13 18-5 6-8 18-5 18 5 0 13-18 24-18 24s-18-11-18-24Z' fill='none' stroke='%23ff8fb1' stroke-opacity='.12' stroke-width='2'/%3E%3Cellipse cx='171' cy='52' rx='6' ry='17' fill='%23ffb3c7' fill-opacity='.11' transform='rotate(34 171 52)'/%3E%3Cellipse cx='92' cy='191' rx='5' ry='15' fill='%23ff6f91' fill-opacity='.09' transform='rotate(-28 92 191)'/%3E%3Cellipse cx='28' cy='141' rx='4' ry='13' fill='%23ffd1df' fill-opacity='.08' transform='rotate(58 28 141)'/%3E%3C/svg%3E");
+  --chat-romance-pattern: var(--romance-day-pattern);
   --danger: #d04747;
   --shadow: 0 18px 45px rgba(30, 30, 40, 0.14);
 }
@@ -111,6 +112,7 @@ body.night-mode {
   --field-text: #ffffff;
   --field-placeholder: #a8afbf;
   --menu-surface: rgba(35, 42, 56, 0.96);
+  --chat-romance-pattern: var(--romance-night-pattern);
 }
 
 button,
@@ -390,8 +392,17 @@ button {
   overflow-y: auto;
   padding: 17px 11px 18px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), var(--surface) 18%),
+    var(--chat-romance-pattern),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, transparent), var(--surface) 22%),
     var(--surface);
+  background-position:
+    18px 12px,
+    0 0,
+    0 0;
+  background-size:
+    220px 260px,
+    auto,
+    auto;
   display: flex;
   flex-direction: column;
   gap: 5px;
