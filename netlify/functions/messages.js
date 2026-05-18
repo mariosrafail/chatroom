@@ -34,7 +34,10 @@ function cleanRoom(room) {
 }
 
 function cleanText(value, maxLength) {
-  return String(value || "").trim().slice(0, maxLength);
+  return String(value || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .slice(0, maxLength);
 }
 
 function cleanDate(value) {

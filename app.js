@@ -157,11 +157,17 @@ function normalizeMessage(message) {
   return {
     id: String(message.id),
     author: message.author,
-    text: message.text,
+    text: cleanMessageText(message.text),
     createdAt: message.createdAt || message.created_at,
     chatDate: normalizeDateKey(message.chatDate || message.chat_date || state.activeDate),
     seenBy: message.seenBy || message.seen_by || [],
   };
+}
+
+function cleanMessageText(value) {
+  return String(value || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
 }
 
 function normalizeDateKey(value) {
@@ -195,7 +201,7 @@ function renderNotificationButton() {
 }
 
 function renderMessages() {
-  const roomMessages = state.messages[state.activeDate] ?? [];
+  const roomMessages = (state.messages[state.activeDate] ?? []).filter((message) => message.text.length > 0);
   const latestOwnMessage = [...roomMessages].reverse().find((message) => message.author === state.profileName);
   messagesEl.replaceChildren();
 
@@ -212,26 +218,35 @@ function renderMessages() {
     return;
   }
 
-  roomMessages.forEach((message) => {
+  roomMessages.forEach((message, index) => {
     const isMine = message.author === state.profileName;
     const isLatestOwn = latestOwnMessage?.id === message.id;
+    const previousMessage = roomMessages[index - 1];
+    const nextMessage = roomMessages[index + 1];
+    const groupedWithPrevious = isGroupedMessage(previousMessage, message);
+    const continuesGroup = isGroupedMessage(message, nextMessage);
     const item = document.createElement("article");
     item.className = `message ${isMine ? "mine" : "theirs"}`;
+    item.classList.toggle("grouped", groupedWithPrevious);
+    item.classList.toggle("continues", continuesGroup);
     if (!renderedMessageIds.has(message.id)) {
       item.classList.add("new-message");
     }
 
-    const meta = document.createElement("div");
-    meta.className = "message-meta";
-    meta.innerHTML = `<span></span><span></span>`;
-    meta.children[0].textContent = isMine ? "You" : message.author;
-    meta.children[1].textContent = formatTime(message.createdAt);
+    if (!groupedWithPrevious) {
+      const meta = document.createElement("div");
+      meta.className = "message-meta";
+      meta.innerHTML = `<span></span><span></span>`;
+      meta.children[0].textContent = isMine ? "You" : message.author;
+      meta.children[1].textContent = formatTime(message.createdAt);
+      item.append(meta);
+    }
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     bubble.textContent = message.text;
 
-    item.append(meta, bubble);
+    item.append(bubble);
 
     if (isMine && isLatestOwn) {
       const delivery = document.createElement("div");
@@ -245,6 +260,18 @@ function renderMessages() {
   });
 
   messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function isGroupedMessage(firstMessage, secondMessage) {
+  if (!firstMessage || !secondMessage || firstMessage.author !== secondMessage.author) {
+    return false;
+  }
+
+  const firstTime = new Date(firstMessage.createdAt).getTime();
+  const secondTime = new Date(secondMessage.createdAt).getTime();
+  const fiveMinutes = 1000 * 60 * 5;
+
+  return Math.abs(secondTime - firstTime) <= fiveMinutes;
 }
 
 function render() {
@@ -413,7 +440,7 @@ async function addMessage(text) {
     return;
   }
 
-  const cleanText = text.trim();
+  const cleanText = cleanMessageText(text);
   if (!cleanText) {
     return;
   }

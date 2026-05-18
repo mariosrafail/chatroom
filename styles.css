@@ -311,7 +311,7 @@ button {
     var(--surface);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
@@ -348,6 +348,10 @@ button {
   transform-origin: bottom left;
 }
 
+.message.grouped {
+  margin-top: -2px;
+}
+
 .message.new-message {
   animation: messageIn 260ms cubic-bezier(0.2, 0.85, 0.22, 1.12) both;
 }
@@ -363,6 +367,8 @@ button {
 
 .message-meta {
   padding: 0 11px;
+  margin-top: 8px;
+  margin-bottom: 2px;
   color: var(--muted);
   font-size: 0.67rem;
   font-weight: 520;
@@ -385,6 +391,26 @@ button {
   transition:
     transform 160ms ease,
     filter 160ms ease;
+}
+
+.message.continues .bubble::after {
+  display: none;
+}
+
+.message.continues.mine .bubble {
+  border-bottom-right-radius: 20px;
+}
+
+.message.continues.theirs .bubble {
+  border-bottom-left-radius: 20px;
+}
+
+.message.grouped.mine .bubble {
+  border-top-right-radius: 20px;
+}
+
+.message.grouped.theirs .bubble {
+  border-top-left-radius: 20px;
 }
 
 .mine .bubble::after,
