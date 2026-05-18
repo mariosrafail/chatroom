@@ -358,10 +358,6 @@ messageInput.addEventListener("keydown", (event) => {
   }
 });
 
-document.querySelector("#quickButton").addEventListener("click", () => {
-  addMessage("Got it, moving on.");
-});
-
 notifyButton.addEventListener("click", requestNotifications);
 
 if ("serviceWorker" in navigator) {
