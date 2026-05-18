@@ -5,7 +5,7 @@ const allowedRooms = new Set(["General"]);
 const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
   "Content-Type": "application/json",
 };
 
@@ -78,6 +78,20 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === "GET") {
     const room = cleanRoom(event.queryStringParameters?.room);
+    const viewer = cleanText(event.queryStringParameters?.viewer, 24);
+
+    if (viewer) {
+      await db`
+        INSERT INTO message_reads (message_id, viewer)
+        SELECT id, ${viewer}
+        FROM messages
+        WHERE room = ${room}
+          AND author <> ${viewer}
+        ON CONFLICT (message_id, viewer)
+        DO UPDATE SET seen_at = NOW()
+      `;
+    }
+
     const rows = await db`
       SELECT
         m.id,
@@ -146,42 +160,6 @@ exports.handler = async (event) => {
         seenBy: [],
       },
     });
-  }
-
-  if (event.httpMethod === "PATCH") {
-    let payload;
-    try {
-      payload = JSON.parse(event.body || "{}");
-    } catch {
-      return json(400, { error: "Invalid JSON body" });
-    }
-
-    const room = cleanRoom(payload.room);
-    const viewer = cleanText(payload.viewer, 24);
-    const messageIds = Array.isArray(payload.messageIds)
-      ? payload.messageIds
-          .map((id) => Number(id))
-          .filter((id) => Number.isSafeInteger(id) && id > 0)
-          .slice(0, 100)
-      : [];
-
-    if (!viewer || messageIds.length === 0) {
-      return json(200, { saved: 0 });
-    }
-
-    const rows = await db`
-      INSERT INTO message_reads (message_id, viewer)
-      SELECT id, ${viewer}
-      FROM messages
-      WHERE room = ${room}
-        AND author <> ${viewer}
-        AND id = ANY(${messageIds}::bigint[])
-      ON CONFLICT (message_id, viewer)
-      DO UPDATE SET seen_at = NOW()
-      RETURNING message_id
-    `;
-
-    return json(200, { saved: rows.length });
   }
 
   return json(405, { error: "Method not allowed" });

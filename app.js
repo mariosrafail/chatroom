@@ -33,7 +33,6 @@ const state = {
 const deliveryState = new Map();
 const renderedMessageIds = new Set();
 const knownRemoteMessageIds = new Set();
-const markedSeenMessageIds = new Set();
 let hasLoadedRemoteMessages = false;
 
 const messagesEl = document.querySelector("#messages");
@@ -128,7 +127,7 @@ function getDeliveryStatus(message) {
     return localStatus;
   }
 
-  return message.seenBy.length > 0 ? "Seen" : "Sent";
+  return message.seenBy.length > 0 ? `Seen by ${message.seenBy.join(", ")}` : "Sent";
 }
 
 function renderHeader() {
@@ -212,7 +211,12 @@ async function fetchMessages({ showLoading = false } = {}) {
   }
 
   try {
-    const response = await fetch(`${apiUrl}?room=${encodeURIComponent(state.activeRoom)}`);
+    const params = new URLSearchParams({ room: state.activeRoom });
+    if (state.profileName) {
+      params.set("viewer", state.profileName);
+    }
+
+    const response = await fetch(`${apiUrl}?${params.toString()}`);
     if (!response.ok) {
       throw new Error("Message fetch failed");
     }
@@ -232,51 +236,11 @@ async function fetchMessages({ showLoading = false } = {}) {
     state.online = true;
 
     newIncomingMessages.forEach(showIncomingNotification);
-    markMessagesSeen(nextMessages);
   } catch {
     state.online = false;
   } finally {
     state.loading = false;
     render();
-  }
-}
-
-async function markMessagesSeen(messages) {
-  if (!state.profileName) {
-    return;
-  }
-
-  const messageIds = messages
-    .filter(
-      (message) =>
-        message.author !== state.profileName &&
-        /^\d+$/.test(message.id) &&
-        !markedSeenMessageIds.has(message.id)
-    )
-    .map((message) => message.id);
-
-  if (messageIds.length === 0) {
-    return;
-  }
-
-  try {
-    const response = await fetch(apiUrl, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        room: state.activeRoom,
-        viewer: state.profileName,
-        messageIds,
-      }),
-    });
-
-    if (response.ok) {
-      messageIds.forEach((id) => markedSeenMessageIds.add(id));
-    }
-  } catch {
-    // Read receipts are best-effort; sending and loading messages should keep working.
   }
 }
 
@@ -437,6 +401,7 @@ profileForm.addEventListener("submit", (event) => {
   profileDialog.close();
   render();
   resizeInput();
+  fetchMessages();
 });
 
 messageForm.addEventListener("submit", (event) => {
