@@ -1,4 +1,6 @@
 const storageKey = "mobile-chat-room-profile-v2";
+const legacyStorageKeys = ["mobile-chat-room-profile"];
+const profileCookieName = "soulmate_profile_name";
 const apiUrl = "/.netlify/functions/messages";
 const appName = "SoulMate Chat";
 const pollMs = 3000;
@@ -52,12 +54,55 @@ const notifyButton = document.querySelector("#notifyButton");
 const notifyToast = document.querySelector("#notifyToast");
 
 function loadProfileName() {
-  const saved = localStorage.getItem(storageKey);
-  return saved || "";
+  const saved = readStoredProfileName();
+  if (saved) {
+    writeStoredProfileName(saved);
+  }
+
+  return saved;
 }
 
 function saveProfileName() {
-  localStorage.setItem(storageKey, state.profileName);
+  writeStoredProfileName(state.profileName);
+}
+
+function readStoredProfileName() {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      return saved;
+    }
+
+    for (const key of legacyStorageKeys) {
+      const legacyName = localStorage.getItem(key);
+      if (legacyName) {
+        return legacyName;
+      }
+    }
+  } catch {
+    // Some mobile browser modes can block storage; fall back to cookie below.
+  }
+
+  return readCookie(profileCookieName);
+}
+
+function writeStoredProfileName(name) {
+  try {
+    localStorage.setItem(storageKey, name);
+  } catch {
+    // Cookie fallback below still keeps the name for normal mobile browsing.
+  }
+
+  const maxAge = 60 * 60 * 24 * 365;
+  document.cookie = `${profileCookieName}=${encodeURIComponent(name)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+}
+
+function readCookie(name) {
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+
+  return match ? decodeURIComponent(match.split("=").slice(1).join("=")) : "";
 }
 
 function formatTime(timestamp) {
