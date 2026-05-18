@@ -1,5 +1,8 @@
 :root {
   color-scheme: light;
+  --day-opacity: 1;
+  --night-opacity: 0;
+  --twilight-opacity: 0;
   --bg: #f5f5f7;
   --surface: #ffffff;
   --surface-strong: #f2f2f7;
@@ -28,12 +31,51 @@ body {
   margin: 0;
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at 18% 10%, rgba(255, 45, 112, 0.08), transparent 28%),
-    radial-gradient(circle at 92% 6%, rgba(0, 122, 255, 0.08), transparent 32%),
-    var(--bg);
+  background: #08111f;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  isolation: isolate;
+  transition:
+    color 800ms ease,
+    background-color 800ms ease;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 1200ms ease;
+}
+
+body::before {
+  z-index: -2;
+  opacity: var(--day-opacity);
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255, 45, 112, 0.1), transparent 28%),
+    radial-gradient(circle at 82% 6%, rgba(0, 122, 255, 0.16), transparent 34%),
+    linear-gradient(180deg, #eaf6ff 0%, #fff7fb 54%, #f7f4ff 100%);
+}
+
+body::after {
+  z-index: -1;
+  opacity: var(--night-opacity);
+  background:
+    radial-gradient(circle at 74% 14%, rgba(255, 255, 255, 0.2), transparent 4%),
+    radial-gradient(circle at 18% 22%, rgba(122, 92, 255, 0.22), transparent 32%),
+    radial-gradient(circle at 88% 68%, rgba(0, 122, 255, 0.13), transparent 30%),
+    linear-gradient(180deg, #08111f 0%, #111827 58%, #1f1830 100%);
+}
+
+body.night-mode {
+  --surface: rgba(21, 27, 39, 0.94);
+  --surface-strong: rgba(35, 42, 56, 0.92);
+  --text: #f7f7fb;
+  --muted: #a8afbf;
+  --line: rgba(255, 255, 255, 0.14);
+  --theirs: rgba(55, 62, 78, 0.94);
+  --composer: rgba(22, 28, 40, 0.9);
 }
 
 button,
@@ -52,6 +94,8 @@ button {
   display: grid;
   place-items: center;
   padding: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .chat-app {
@@ -60,10 +104,14 @@ button {
   height: 100svh;
   max-width: 520px;
   overflow: hidden;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   display: grid;
   grid-template-rows: auto 1fr auto;
   isolation: isolate;
+  transition:
+    background 900ms ease,
+    border-color 900ms ease,
+    box-shadow 900ms ease;
 }
 
 .topbar {
@@ -74,7 +122,7 @@ button {
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid rgba(60, 60, 67, 0.16);
-  background: rgba(249, 249, 249, 0.78);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
   z-index: 3;
@@ -166,13 +214,52 @@ button {
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   gap: 12px;
-  background: rgba(249, 249, 249, 0.94);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   border-right: 1px solid rgba(60, 60, 67, 0.14);
   box-shadow: 22px 0 44px rgba(0, 0, 0, 0.16);
   transform: translateX(-105%);
   transition: transform 220ms cubic-bezier(0.2, 0.85, 0.22, 1);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
+}
+
+.city-control {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.city-control select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0 12px;
+  color: var(--text);
+  background: var(--surface-strong);
+  outline: none;
+}
+
+.sun-card {
+  padding: 11px 12px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 183, 77, calc(var(--twilight-opacity) * 0.22)), transparent),
+    var(--surface-strong);
+}
+
+.sun-card span {
+  font-weight: 780;
+}
+
+.sun-card small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 560;
 }
 
 .calendar-panel.open {
@@ -307,7 +394,7 @@ button {
   overflow-y: auto;
   padding: 17px 11px 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 1) 18%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), var(--surface) 18%),
     var(--surface);
   display: flex;
   flex-direction: column;
@@ -320,7 +407,7 @@ button {
   align-self: center;
   padding: 4px 11px;
   border-radius: 999px;
-  background: #f2f2f7;
+  background: var(--surface-strong);
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 600;
@@ -444,7 +531,7 @@ button {
 
 .theirs .bubble {
   color: var(--text);
-  background: linear-gradient(180deg, #f0f0f2 0%, var(--theirs) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--theirs) 86%, white) 0%, var(--theirs) 100%);
   border-bottom-left-radius: 5px;
 }
 

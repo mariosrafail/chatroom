@@ -1,6 +1,7 @@
 const storageKey = "mobile-chat-room-profile-v2";
 const legacyStorageKeys = ["mobile-chat-room-profile"];
 const profileCookieName = "soulmate_profile_name";
+const cityStorageKey = "soulmate_city";
 const apiUrl = "/.netlify/functions/messages";
 const appName = "SoulMate Chat";
 const pollMs = 3000;
@@ -8,6 +9,12 @@ const notificationIcon = "/icons/icon-192.png";
 const todayDate = getLocalDateKey();
 const typingIdleMs = 4200;
 const typingThrottleMs = 1800;
+const greekCities = {
+  athens: { name: "Athens", latitude: 37.9838, longitude: 23.7275 },
+  thessaloniki: { name: "Thessaloniki", latitude: 40.6401, longitude: 22.9444 },
+  patra: { name: "Patra", latitude: 38.2466, longitude: 21.7346 },
+  heraklion: { name: "Heraklion", latitude: 35.3387, longitude: 25.1442 },
+};
 
 const fallbackMessages = {
   [todayDate]: [
@@ -32,6 +39,8 @@ const state = {
   activeDate: todayDate,
   availableDays: [{ chatDate: todayDate, count: 0 }],
   typingUsers: [],
+  cityKey: loadCityKey(),
+  sun: null,
   online: false,
   loading: false,
   messages: structuredClone(fallbackMessages),
@@ -73,6 +82,10 @@ const editInput = document.querySelector("#editInput");
 const cancelEditButton = document.querySelector("#cancelEditButton");
 const historyDialog = document.querySelector("#historyDialog");
 const historyList = document.querySelector("#historyList");
+const citySelect = document.querySelector("#citySelect");
+const sunMode = document.querySelector("#sunMode");
+const sunTimes = document.querySelector("#sunTimes");
+const dayLength = document.querySelector("#dayLength");
 let selectedMessage = null;
 let longPressTimer = null;
 let lastTypingSentAt = 0;
@@ -89,6 +102,27 @@ function loadProfileName() {
 
 function saveProfileName() {
   writeStoredProfileName(state.profileName);
+}
+
+function loadCityKey() {
+  try {
+    const saved = localStorage.getItem(cityStorageKey);
+    if (saved && greekCities[saved]) {
+      return saved;
+    }
+  } catch {
+    // Default below is still valid.
+  }
+
+  return "athens";
+}
+
+function saveCityKey(cityKey) {
+  try {
+    localStorage.setItem(cityStorageKey, cityKey);
+  } catch {
+    // Non-critical preference.
+  }
 }
 
 function readStoredProfileName() {
@@ -135,6 +169,13 @@ function formatTime(timestamp) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(timestamp));
+}
+
+function formatClock(date) {
+  return new Intl.DateTimeFormat("el-GR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function getLocalDateKey(date = new Date()) {
@@ -219,6 +260,7 @@ function renderHeader() {
   avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "?";
   renderNotificationButton();
   renderCalendar();
+  renderSunCard();
 }
 
 function renderNotificationButton() {
@@ -400,6 +442,25 @@ function renderCalendar() {
   });
 
   todayButton.classList.toggle("active", state.activeDate === getLocalDateKey());
+  citySelect.value = state.cityKey;
+}
+
+function renderSunCard() {
+  if (!state.sun) {
+    return;
+  }
+
+  const city = greekCities[state.cityKey];
+  sunMode.textContent = `${state.sun.isNight ? "Night" : "Day"} in ${city.name}`;
+  sunTimes.textContent = `Sunrise ${formatClock(state.sun.sunrise)} · Sunset ${formatClock(state.sun.sunset)}`;
+  dayLength.textContent = `Day length ${formatDuration(state.sun.dayLengthMs)}`;
+}
+
+function formatDuration(durationMs) {
+  const totalMinutes = Math.round(durationMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
 }
 
 function mergeAvailableDays() {
@@ -519,6 +580,132 @@ function refreshTodayDate() {
   if (state.activeDate === todayDate && currentDate !== todayDate) {
     state.activeDate = currentDate;
   }
+}
+
+function updateSunTheme() {
+  const city = greekCities[state.cityKey] || greekCities.athens;
+  const sun = calculateSunTimes(new Date(), city.latitude, city.longitude);
+  const now = new Date();
+  const daylight = calculateDaylightFactor(now, sun.sunrise, sun.sunset);
+  const twilight = 1 - Math.abs(daylight - 0.5) * 2;
+  const isNight = daylight < 0.12;
+
+  state.sun = {
+    ...sun,
+    daylight,
+    isNight,
+  };
+
+  document.documentElement.style.setProperty("--day-opacity", daylight.toFixed(3));
+  document.documentElement.style.setProperty("--night-opacity", (1 - daylight).toFixed(3));
+  document.documentElement.style.setProperty("--twilight-opacity", Math.max(0, twilight).toFixed(3));
+  document.body.classList.toggle("night-mode", isNight);
+  document.body.classList.toggle("day-mode", !isNight);
+
+  const theme = isNight ? "#111827" : "#ff2d70";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme);
+  renderSunCard();
+}
+
+function calculateDaylightFactor(now, sunrise, sunset) {
+  const dawnStart = new Date(sunrise.getTime() - 90 * 60000);
+  const dawnEnd = new Date(sunrise.getTime() + 45 * 60000);
+  const duskStart = new Date(sunset.getTime() - 120 * 60000);
+  const duskEnd = new Date(sunset.getTime() + 75 * 60000);
+
+  if (now < dawnStart || now > duskEnd) {
+    return 0;
+  }
+
+  if (now >= dawnStart && now < dawnEnd) {
+    return smoothStep((now - dawnStart) / (dawnEnd - dawnStart));
+  }
+
+  if (now >= duskStart && now <= duskEnd) {
+    return 1 - smoothStep((now - duskStart) / (duskEnd - duskStart));
+  }
+
+  return 1;
+}
+
+function smoothStep(value) {
+  const x = Math.min(1, Math.max(0, value));
+  return x * x * (3 - 2 * x);
+}
+
+function calculateSunTimes(date, latitude, longitude) {
+  const zenith = 90.833;
+  const sunriseUtc = calculateSunEventUtc(date, latitude, longitude, zenith, true);
+  const sunsetUtc = calculateSunEventUtc(date, latitude, longitude, zenith, false);
+  const sunrise = new Date(sunriseUtc);
+  const sunset = new Date(sunsetUtc);
+
+  return {
+    sunrise,
+    sunset,
+    dayLengthMs: sunset - sunrise,
+  };
+}
+
+function calculateSunEventUtc(date, latitude, longitude, zenith, isSunrise) {
+  const dayOfYear = getDayOfYear(date);
+  const lngHour = longitude / 15;
+  const t = dayOfYear + ((isSunrise ? 6 : 18) - lngHour) / 24;
+  const meanAnomaly = 0.9856 * t - 3.289;
+  let trueLongitude =
+    meanAnomaly +
+    1.916 * Math.sin(toRadians(meanAnomaly)) +
+    0.02 * Math.sin(toRadians(2 * meanAnomaly)) +
+    282.634;
+  trueLongitude = normalizeDegrees(trueLongitude);
+
+  let rightAscension = toDegrees(Math.atan(0.91764 * Math.tan(toRadians(trueLongitude))));
+  rightAscension = normalizeDegrees(rightAscension);
+  const longitudeQuadrant = Math.floor(trueLongitude / 90) * 90;
+  const ascensionQuadrant = Math.floor(rightAscension / 90) * 90;
+  rightAscension = (rightAscension + longitudeQuadrant - ascensionQuadrant) / 15;
+
+  const sinDeclination = 0.39782 * Math.sin(toRadians(trueLongitude));
+  const cosDeclination = Math.cos(Math.asin(sinDeclination));
+  const cosHour =
+    (Math.cos(toRadians(zenith)) - sinDeclination * Math.sin(toRadians(latitude))) /
+    (cosDeclination * Math.cos(toRadians(latitude)));
+
+  if (cosHour > 1 || cosHour < -1) {
+    const fallback = new Date(date);
+    fallback.setHours(isSunrise ? 7 : 19, 0, 0, 0);
+    return fallback.getTime();
+  }
+
+  let hourAngle = isSunrise ? 360 - toDegrees(Math.acos(cosHour)) : toDegrees(Math.acos(cosHour));
+  hourAngle /= 15;
+
+  const localMeanTime = hourAngle + rightAscension - 0.06571 * t - 6.622;
+  const utcHour = normalizeHours(localMeanTime - lngHour);
+  const result = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0));
+  result.setUTCMinutes(Math.round(utcHour * 60));
+  return result.getTime();
+}
+
+function getDayOfYear(date) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  return Math.floor((date - start) / 86400000);
+}
+
+function toRadians(degrees) {
+  return (degrees * Math.PI) / 180;
+}
+
+function toDegrees(radians) {
+  return (radians * 180) / Math.PI;
+}
+
+function normalizeDegrees(degrees) {
+  return ((degrees % 360) + 360) % 360;
+}
+
+function normalizeHours(hours) {
+  return ((hours % 24) + 24) % 24;
 }
 
 function showToast(message) {
@@ -917,6 +1104,11 @@ menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
 calendarScrim.addEventListener("click", closeCalendar);
 todayButton.addEventListener("click", () => selectDate(getLocalDateKey()));
+citySelect.addEventListener("change", () => {
+  state.cityKey = greekCities[citySelect.value] ? citySelect.value : "athens";
+  saveCityKey(state.cityKey);
+  updateSunTheme();
+});
 copyMessageButton.addEventListener("click", copySelectedMessage);
 editMessageButton.addEventListener("click", openEditDialog);
 deleteMessageButton.addEventListener("click", deleteSelectedMessage);
@@ -936,9 +1128,11 @@ if ("serviceWorker" in navigator) {
 }
 
 resizeInput();
+updateSunTheme();
 render();
 fetchMessages({ showLoading: true });
 setInterval(() => fetchMessages(), pollMs);
+setInterval(updateSunTheme, 60000);
 
 if (!state.profileName) {
   openProfileDialog({ required: true });
