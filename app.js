@@ -86,6 +86,7 @@ let selectedMessage = null;
 let longPressTimer = null;
 let lastTypingSentAt = 0;
 let typingStopTimer = null;
+let historyTouchStartY = 0;
 
 function loadProfileName() {
   const saved = readStoredProfileName();
@@ -534,6 +535,7 @@ async function fetchMessages({ showLoading = false, older = false } = {}) {
     state.loading = false;
     state.loadingOlder = false;
     render({ scroll: older ? "keep-top" : wasNearBottom || showLoading ? "bottom" : "preserve" });
+    ensureScrollableHistory();
   }
 }
 
@@ -1037,12 +1039,25 @@ function closeCalendar() {
   calendarScrim.hidden = true;
 }
 
-function loadOlderMessagesIfNeeded() {
-  if (messagesEl.scrollTop > 24 || state.loading || state.loadingOlder || !state.hasMoreMessages) {
+function canLoadOlderMessages() {
+  return !state.loading && !state.loadingOlder && state.hasMoreMessages;
+}
+
+function loadOlderMessagesIfNeeded({ force = false } = {}) {
+  if (!canLoadOlderMessages() || (!force && messagesEl.scrollTop > 24)) {
     return;
   }
 
   fetchMessages({ older: true });
+}
+
+function ensureScrollableHistory() {
+  requestAnimationFrame(() => {
+    const needsMoreRows = messagesEl.scrollHeight <= messagesEl.clientHeight + 24;
+    if (needsMoreRows) {
+      loadOlderMessagesIfNeeded({ force: true });
+    }
+  });
 }
 
 function keepComposerFocused() {
@@ -1122,7 +1137,33 @@ messageInput.addEventListener("keydown", (event) => {
   }
 });
 
-messagesEl.addEventListener("scroll", loadOlderMessagesIfNeeded, { passive: true });
+messagesEl.addEventListener("scroll", () => loadOlderMessagesIfNeeded(), { passive: true });
+messagesEl.addEventListener(
+  "touchstart",
+  (event) => {
+    historyTouchStartY = event.touches[0]?.clientY || 0;
+  },
+  { passive: true }
+);
+messagesEl.addEventListener(
+  "touchmove",
+  (event) => {
+    const currentY = event.touches[0]?.clientY || 0;
+    if (currentY - historyTouchStartY > 18 && messagesEl.scrollTop <= 24) {
+      loadOlderMessagesIfNeeded({ force: true });
+    }
+  },
+  { passive: true }
+);
+messagesEl.addEventListener(
+  "wheel",
+  (event) => {
+    if (event.deltaY < 0 && messagesEl.scrollTop <= 24) {
+      loadOlderMessagesIfNeeded({ force: true });
+    }
+  },
+  { passive: true }
+);
 notifyButton.addEventListener("click", requestNotifications);
 menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
