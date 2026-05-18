@@ -6,6 +6,8 @@ const appName = "SoulMate Chat";
 const pollMs = 3000;
 const notificationIcon = "/icons/icon-192.png";
 const todayDate = getLocalDateKey();
+const typingIdleMs = 4200;
+const typingThrottleMs = 1800;
 
 const fallbackMessages = {
   [todayDate]: [
@@ -29,6 +31,7 @@ const state = {
   activeRoom: "General",
   activeDate: todayDate,
   availableDays: [{ chatDate: todayDate, count: 0 }],
+  typingUsers: [],
   online: false,
   loading: false,
   messages: structuredClone(fallbackMessages),
@@ -72,6 +75,8 @@ const historyDialog = document.querySelector("#historyDialog");
 const historyList = document.querySelector("#historyList");
 let selectedMessage = null;
 let longPressTimer = null;
+let lastTypingSentAt = 0;
+let typingStopTimer = null;
 
 function loadProfileName() {
   const saved = readStoredProfileName();
@@ -295,7 +300,36 @@ function renderMessages() {
     renderedMessageIds.add(message.id);
   });
 
+  renderTypingIndicator();
+
   messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function renderTypingIndicator() {
+  if (!isTodayActive() || state.typingUsers.length === 0) {
+    return;
+  }
+
+  const item = document.createElement("article");
+  item.className = "message theirs typing-message";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble typing-bubble";
+
+  const names = document.createElement("span");
+  names.className = "typing-text";
+  names.textContent =
+    state.typingUsers.length === 1
+      ? `${state.typingUsers[0]} typing`
+      : `${state.typingUsers.join(", ")} typing`;
+
+  const dots = document.createElement("span");
+  dots.className = "typing-dots";
+  dots.innerHTML = "<i></i><i></i><i></i>";
+
+  bubble.append(names, dots);
+  item.append(bubble);
+  messagesEl.append(item);
 }
 
 function attachMessageActions(element, message) {
@@ -407,6 +441,7 @@ async function fetchMessages({ showLoading = false } = {}) {
 
     state.messages[state.activeDate] = nextMessages;
     state.availableDays = normalizeDays(data.days);
+    state.typingUsers = Array.isArray(data.typing) ? data.typing.filter((name) => name !== state.profileName) : [];
     nextMessages.forEach((message) => knownRemoteMessageIds.add(message.id));
     hasLoadedRemoteMessages = true;
     state.online = true;
@@ -418,6 +453,54 @@ async function fetchMessages({ showLoading = false } = {}) {
     state.loading = false;
     render();
   }
+}
+
+async function sendTypingStatus(isTyping) {
+  if (!state.profileName || !isTodayActive()) {
+    return;
+  }
+
+  try {
+    await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "typing",
+        room: state.activeRoom,
+        chatDate: getLocalDateKey(),
+        author: state.profileName,
+        typing: isTyping,
+      }),
+    });
+  } catch {
+    // Typing presence is best-effort.
+  }
+}
+
+function scheduleTypingStatus() {
+  if (!state.profileName || !isTodayActive()) {
+    return;
+  }
+
+  const hasText = cleanMessageText(messageInput.value).length > 0;
+  window.clearTimeout(typingStopTimer);
+
+  if (!hasText) {
+    sendTypingStatus(false);
+    return;
+  }
+
+  const now = Date.now();
+  if (now - lastTypingSentAt > typingThrottleMs) {
+    lastTypingSentAt = now;
+    sendTypingStatus(true);
+  }
+
+  typingStopTimer = window.setTimeout(() => {
+    sendTypingStatus(false);
+  }, typingIdleMs);
 }
 
 function normalizeDays(days) {
@@ -690,6 +773,7 @@ async function addMessage(text) {
 
   messageInput.value = "";
   resizeInput();
+  sendTypingStatus(false);
   keepComposerFocused();
   state.activeDate = getLocalDateKey();
   state.messages[state.activeDate] ??= [];
@@ -816,7 +900,10 @@ sendButton.addEventListener("pointerdown", (event) => {
   event.preventDefault();
 });
 
-messageInput.addEventListener("input", resizeInput);
+messageInput.addEventListener("input", () => {
+  resizeInput();
+  scheduleTypingStatus();
+});
 
 messageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {

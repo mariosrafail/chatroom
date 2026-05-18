@@ -87,6 +87,16 @@ async function ensureSchema(db) {
       )
     `;
     await db`CREATE INDEX IF NOT EXISTS message_reads_viewer_idx ON message_reads (viewer)`;
+    await db`
+      CREATE TABLE IF NOT EXISTS typing_status (
+        room TEXT NOT NULL,
+        chat_date DATE NOT NULL,
+        author TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (room, chat_date, author)
+      )
+    `;
+    await db`CREATE INDEX IF NOT EXISTS typing_status_active_idx ON typing_status (room, chat_date, updated_at DESC)`;
   })();
 
   return schemaReady;
@@ -132,6 +142,19 @@ exports.handler = async (event) => {
       LIMIT 90
     `;
 
+    const typing = viewer
+      ? await db`
+          SELECT author
+          FROM typing_status
+          WHERE room = ${room}
+            AND chat_date = ${chatDate}::date
+            AND author <> ${viewer}
+            AND updated_at > NOW() - INTERVAL '6 seconds'
+          ORDER BY updated_at DESC
+          LIMIT 3
+        `
+      : [];
+
     const rows = await db`
       SELECT
         m.id,
@@ -175,6 +198,7 @@ exports.handler = async (event) => {
         chatDate: day.chat_date,
         count: day.count,
       })),
+      typing: typing.map((row) => row.author),
       messages: rows.map((row) => ({
         id: row.id,
         room: row.room,
@@ -200,6 +224,32 @@ exports.handler = async (event) => {
     const room = cleanRoom(payload.room);
     const chatDate = cleanDate(payload.chatDate);
     const author = cleanText(payload.author, 24) || "User";
+
+    if (payload.action === "typing") {
+      if (!author) {
+        return json(400, { error: "Author is required" });
+      }
+
+      if (payload.typing === false) {
+        await db`
+          DELETE FROM typing_status
+          WHERE room = ${room}
+            AND chat_date = ${chatDate}::date
+            AND author = ${author}
+        `;
+        return json(200, { typing: false });
+      }
+
+      await db`
+        INSERT INTO typing_status (room, chat_date, author, updated_at)
+        VALUES (${room}, ${chatDate}::date, ${author}, NOW())
+        ON CONFLICT (room, chat_date, author)
+        DO UPDATE SET updated_at = NOW()
+      `;
+
+      return json(200, { typing: true });
+    }
+
     const text = cleanText(payload.text, 1000);
 
     if (!text) {
