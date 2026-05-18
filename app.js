@@ -1,7 +1,6 @@
 const storageKey = "mobile-chat-room-profile-v2";
 const legacyStorageKeys = ["mobile-chat-room-profile"];
 const profileCookieName = "soulmate_profile_name";
-const cityStorageKey = "soulmate_city";
 const apiUrl = "/.netlify/functions/messages";
 const appName = "SoulMate Chat";
 const pollMs = 3000;
@@ -9,12 +8,7 @@ const notificationIcon = "/icons/icon-192.png";
 const todayDate = getLocalDateKey();
 const typingIdleMs = 4200;
 const typingThrottleMs = 1800;
-const greekCities = {
-  athens: { name: "Athens", latitude: 37.9838, longitude: 23.7275 },
-  thessaloniki: { name: "Thessaloniki", latitude: 40.6401, longitude: 22.9444 },
-  patra: { name: "Patra", latitude: 38.2466, longitude: 21.7346 },
-  heraklion: { name: "Heraklion", latitude: 35.3387, longitude: 25.1442 },
-};
+const themeLocation = { latitude: 37.9838, longitude: 23.7275 };
 
 const fallbackMessages = {
   [todayDate]: [
@@ -39,7 +33,6 @@ const state = {
   activeDate: todayDate,
   availableDays: [{ chatDate: todayDate, count: 0 }],
   typingUsers: [],
-  cityKey: loadCityKey(),
   sun: null,
   online: false,
   loading: false,
@@ -82,7 +75,6 @@ const editInput = document.querySelector("#editInput");
 const cancelEditButton = document.querySelector("#cancelEditButton");
 const historyDialog = document.querySelector("#historyDialog");
 const historyList = document.querySelector("#historyList");
-const citySelect = document.querySelector("#citySelect");
 let selectedMessage = null;
 let longPressTimer = null;
 let lastTypingSentAt = 0;
@@ -99,27 +91,6 @@ function loadProfileName() {
 
 function saveProfileName() {
   writeStoredProfileName(state.profileName);
-}
-
-function loadCityKey() {
-  try {
-    const saved = localStorage.getItem(cityStorageKey);
-    if (saved && greekCities[saved]) {
-      return saved;
-    }
-  } catch {
-    // Default below is still valid.
-  }
-
-  return "athens";
-}
-
-function saveCityKey(cityKey) {
-  try {
-    localStorage.setItem(cityStorageKey, cityKey);
-  } catch {
-    // Non-critical preference.
-  }
 }
 
 function readStoredProfileName() {
@@ -442,7 +413,6 @@ function renderCalendar() {
   });
 
   todayButton.classList.toggle("active", state.activeDate === getLocalDateKey());
-  citySelect.value = state.cityKey;
 }
 
 function mergeAvailableDays() {
@@ -565,8 +535,7 @@ function refreshTodayDate() {
 }
 
 function updateSunTheme() {
-  const city = greekCities[state.cityKey] || greekCities.athens;
-  const sun = calculateSunTimes(new Date(), city.latitude, city.longitude);
+  const sun = calculateSunTimes(new Date(), themeLocation.latitude, themeLocation.longitude);
   const now = new Date();
   const daylight = calculateDaylightFactor(now, sun.sunrise, sun.sunset);
   const twilight = 1 - Math.abs(daylight - 0.5) * 2;
@@ -1085,11 +1054,6 @@ menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
 calendarScrim.addEventListener("click", closeCalendar);
 todayButton.addEventListener("click", () => selectDate(getLocalDateKey()));
-citySelect.addEventListener("change", () => {
-  state.cityKey = greekCities[citySelect.value] ? citySelect.value : "athens";
-  saveCityKey(state.cityKey);
-  updateSunTheme();
-});
 copyMessageButton.addEventListener("click", copySelectedMessage);
 editMessageButton.addEventListener("click", openEditDialog);
 deleteMessageButton.addEventListener("click", deleteSelectedMessage);

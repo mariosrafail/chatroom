@@ -258,24 +258,6 @@ button {
   -webkit-backdrop-filter: blur(28px) saturate(190%);
 }
 
-.city-control {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.city-control select {
-  min-height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 0 12px;
-  color: var(--text);
-  background: var(--surface-strong);
-  outline: none;
-}
-
 .calendar-panel.open {
   transform: translateX(0);
 }
