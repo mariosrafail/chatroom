@@ -241,27 +241,6 @@ button {
   outline: none;
 }
 
-.sun-card {
-  padding: 11px 12px;
-  display: grid;
-  gap: 3px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background:
-    linear-gradient(135deg, rgba(255, 183, 77, calc(var(--twilight-opacity) * 0.22)), transparent),
-    var(--surface-strong);
-}
-
-.sun-card span {
-  font-weight: 780;
-}
-
-.sun-card small {
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 560;
-}
-
 .calendar-panel.open {
   transform: translateX(0);
 }

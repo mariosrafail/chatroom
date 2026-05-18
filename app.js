@@ -83,9 +83,6 @@ const cancelEditButton = document.querySelector("#cancelEditButton");
 const historyDialog = document.querySelector("#historyDialog");
 const historyList = document.querySelector("#historyList");
 const citySelect = document.querySelector("#citySelect");
-const sunMode = document.querySelector("#sunMode");
-const sunTimes = document.querySelector("#sunTimes");
-const dayLength = document.querySelector("#dayLength");
 let selectedMessage = null;
 let longPressTimer = null;
 let lastTypingSentAt = 0;
@@ -171,13 +168,6 @@ function formatTime(timestamp) {
   }).format(new Date(timestamp));
 }
 
-function formatClock(date) {
-  return new Intl.DateTimeFormat("el-GR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
 function getLocalDateKey(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -260,7 +250,6 @@ function renderHeader() {
   avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "?";
   renderNotificationButton();
   renderCalendar();
-  renderSunCard();
 }
 
 function renderNotificationButton() {
@@ -456,24 +445,6 @@ function renderCalendar() {
   citySelect.value = state.cityKey;
 }
 
-function renderSunCard() {
-  if (!state.sun) {
-    return;
-  }
-
-  const city = greekCities[state.cityKey];
-  sunMode.textContent = `${state.sun.isNight ? "Night" : "Day"} in ${city.name}`;
-  sunTimes.textContent = `Sunrise ${formatClock(state.sun.sunrise)} · Sunset ${formatClock(state.sun.sunset)}`;
-  dayLength.textContent = `Day length ${formatDuration(state.sun.dayLengthMs)}`;
-}
-
-function formatDuration(durationMs) {
-  const totalMinutes = Math.round(durationMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-}
-
 function mergeAvailableDays() {
   const daysByDate = new Map();
   state.availableDays.forEach((day) => daysByDate.set(day.chatDate, day));
@@ -615,7 +586,6 @@ function updateSunTheme() {
 
   const theme = isNight ? "#111827" : "#ff2d70";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme);
-  renderSunCard();
 }
 
 function calculateDaylightFactor(now, sunrise, sunset) {
