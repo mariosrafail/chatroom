@@ -323,9 +323,11 @@ async function addMessage(text) {
 
   messageInput.value = "";
   resizeInput();
+  keepComposerFocused();
   state.messages[state.activeRoom] ??= [];
   state.messages[state.activeRoom].push(optimisticMessage);
   render();
+  keepComposerFocused();
 
   try {
     const response = await fetch(apiUrl, {
@@ -357,7 +359,14 @@ async function addMessage(text) {
     deliveryState.set(optimisticMessage.id, "Not sent");
   } finally {
     render();
+    keepComposerFocused();
   }
+}
+
+function keepComposerFocused() {
+  requestAnimationFrame(() => {
+    messageInput.focus({ preventScroll: true });
+  });
 }
 
 function resizeInput() {
@@ -407,6 +416,10 @@ profileForm.addEventListener("submit", (event) => {
 messageForm.addEventListener("submit", (event) => {
   event.preventDefault();
   addMessage(messageInput.value);
+});
+
+sendButton.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
 });
 
 messageInput.addEventListener("input", resizeInput);
