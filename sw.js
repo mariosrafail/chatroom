@@ -1,4 +1,4 @@
-const cacheName = "soulmate-chat-v1";
+const cacheName = "soulmate-chat-v2";
 const assets = [
   "/",
   "/index.html",

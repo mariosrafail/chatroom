@@ -5,9 +5,10 @@ const apiUrl = "/.netlify/functions/messages";
 const appName = "SoulMate Chat";
 const pollMs = 3000;
 const notificationIcon = "/icons/icon-192.png";
+const todayDate = getLocalDateKey();
 
 const fallbackMessages = {
-  General: [
+  [todayDate]: [
     {
       id: "local-1",
       author: "Nikos",
@@ -26,6 +27,8 @@ const fallbackMessages = {
 const state = {
   profileName: loadProfileName(),
   activeRoom: "General",
+  activeDate: todayDate,
+  availableDays: [{ chatDate: todayDate, count: 0 }],
   online: false,
   loading: false,
   messages: structuredClone(fallbackMessages),
@@ -51,6 +54,12 @@ const saveProfileButton = document.querySelector("#saveProfileButton");
 const dialogActions = document.querySelector(".dialog-actions");
 const notifyButton = document.querySelector("#notifyButton");
 const notifyToast = document.querySelector("#notifyToast");
+const menuButton = document.querySelector("#menuButton");
+const closeCalendarButton = document.querySelector("#closeCalendarButton");
+const calendarPanel = document.querySelector("#calendarPanel");
+const calendarScrim = document.querySelector("#calendarScrim");
+const dayList = document.querySelector("#dayList");
+const todayButton = document.querySelector("#todayButton");
 
 function loadProfileName() {
   const saved = readStoredProfileName();
@@ -111,14 +120,52 @@ function formatTime(timestamp) {
   }).format(new Date(timestamp));
 }
 
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDayLabel(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const currentDate = getLocalDateKey();
+
+  if (dateKey === currentDate) {
+    return "Today";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function formatFullDate(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("en", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(year, month - 1, day));
+}
+
 function normalizeMessage(message) {
   return {
     id: String(message.id),
     author: message.author,
     text: message.text,
     createdAt: message.createdAt || message.created_at,
+    chatDate: normalizeDateKey(message.chatDate || message.chat_date || state.activeDate),
     seenBy: message.seenBy || message.seen_by || [],
   };
+}
+
+function normalizeDateKey(value) {
+  return String(value || getLocalDateKey()).slice(0, 10);
 }
 
 function getDeliveryStatus(message) {
@@ -134,6 +181,7 @@ function renderHeader() {
   activeRoomEl.textContent = appName;
   avatarInitial.textContent = state.profileName.trim().charAt(0).toUpperCase() || "?";
   renderNotificationButton();
+  renderCalendar();
 }
 
 function renderNotificationButton() {
@@ -147,13 +195,13 @@ function renderNotificationButton() {
 }
 
 function renderMessages() {
-  const roomMessages = state.messages[state.activeRoom] ?? [];
+  const roomMessages = state.messages[state.activeDate] ?? [];
   const latestOwnMessage = [...roomMessages].reverse().find((message) => message.author === state.profileName);
   messagesEl.replaceChildren();
 
   const dayChip = document.createElement("div");
   dayChip.className = "day-chip";
-  dayChip.textContent = state.loading ? "Loading..." : "Today";
+  dayChip.textContent = state.loading ? "Loading..." : formatFullDate(state.activeDate);
   messagesEl.append(dayChip);
 
   if (roomMessages.length === 0) {
@@ -204,6 +252,43 @@ function render() {
   renderMessages();
 }
 
+function renderCalendar() {
+  const days = mergeAvailableDays();
+  dayList.replaceChildren();
+
+  days.forEach((day) => {
+    const button = document.createElement("button");
+    button.className = "day-option";
+    button.type = "button";
+    button.classList.toggle("active", day.chatDate === state.activeDate);
+    button.dataset.date = day.chatDate;
+
+    const label = document.createElement("span");
+    label.textContent = formatDayLabel(day.chatDate);
+
+    const meta = document.createElement("small");
+    meta.textContent = `${day.count} message${day.count === 1 ? "" : "s"}`;
+
+    button.append(label, meta);
+    button.addEventListener("click", () => {
+      selectDate(day.chatDate);
+    });
+    dayList.append(button);
+  });
+
+  todayButton.classList.toggle("active", state.activeDate === getLocalDateKey());
+}
+
+function mergeAvailableDays() {
+  const daysByDate = new Map();
+  state.availableDays.forEach((day) => daysByDate.set(day.chatDate, day));
+  if (!daysByDate.has(getLocalDateKey())) {
+    daysByDate.set(getLocalDateKey(), { chatDate: getLocalDateKey(), count: 0 });
+  }
+
+  return [...daysByDate.values()].sort((a, b) => b.chatDate.localeCompare(a.chatDate));
+}
+
 async function fetchMessages({ showLoading = false } = {}) {
   if (showLoading) {
     state.loading = true;
@@ -211,7 +296,8 @@ async function fetchMessages({ showLoading = false } = {}) {
   }
 
   try {
-    const params = new URLSearchParams({ room: state.activeRoom });
+    refreshTodayDate();
+    const params = new URLSearchParams({ room: state.activeRoom, date: state.activeDate });
     if (state.profileName) {
       params.set("viewer", state.profileName);
     }
@@ -230,7 +316,8 @@ async function fetchMessages({ showLoading = false } = {}) {
         message.author !== state.profileName
     );
 
-    state.messages[state.activeRoom] = nextMessages;
+    state.messages[state.activeDate] = nextMessages;
+    state.availableDays = normalizeDays(data.days);
     nextMessages.forEach((message) => knownRemoteMessageIds.add(message.id));
     hasLoadedRemoteMessages = true;
     state.online = true;
@@ -241,6 +328,24 @@ async function fetchMessages({ showLoading = false } = {}) {
   } finally {
     state.loading = false;
     render();
+  }
+}
+
+function normalizeDays(days) {
+  if (!Array.isArray(days)) {
+    return [{ chatDate: getLocalDateKey(), count: 0 }];
+  }
+
+  return days.map((day) => ({
+    chatDate: normalizeDateKey(day.chatDate || day.chat_date),
+    count: Number(day.count) || 0,
+  }));
+}
+
+function refreshTodayDate() {
+  const currentDate = getLocalDateKey();
+  if (state.activeDate === todayDate && currentDate !== todayDate) {
+    state.activeDate = currentDate;
   }
 }
 
@@ -318,14 +423,17 @@ async function addMessage(text) {
     author: state.profileName,
     text: cleanText,
     createdAt: new Date().toISOString(),
+    chatDate: getLocalDateKey(),
+    seenBy: [],
   };
   deliveryState.set(optimisticMessage.id, "Sent");
 
   messageInput.value = "";
   resizeInput();
   keepComposerFocused();
-  state.messages[state.activeRoom] ??= [];
-  state.messages[state.activeRoom].push(optimisticMessage);
+  state.activeDate = getLocalDateKey();
+  state.messages[state.activeDate] ??= [];
+  state.messages[state.activeDate].push(optimisticMessage);
   render();
   keepComposerFocused();
 
@@ -337,6 +445,7 @@ async function addMessage(text) {
       },
       body: JSON.stringify({
         room: state.activeRoom,
+        chatDate: state.activeDate,
         author: state.profileName,
         text: cleanText,
       }),
@@ -350,8 +459,8 @@ async function addMessage(text) {
     const savedMessage = normalizeMessage(data.message);
     state.online = true;
     deliveryState.delete(optimisticMessage.id);
-    state.messages[state.activeRoom] = [
-      ...state.messages[state.activeRoom].filter((message) => message.id !== optimisticMessage.id),
+    state.messages[state.activeDate] = [
+      ...state.messages[state.activeDate].filter((message) => message.id !== optimisticMessage.id),
       savedMessage,
     ];
   } catch {
@@ -361,6 +470,24 @@ async function addMessage(text) {
     render();
     keepComposerFocused();
   }
+}
+
+function selectDate(dateKey) {
+  state.activeDate = dateKey;
+  closeCalendar();
+  renderedMessageIds.clear();
+  render();
+  fetchMessages({ showLoading: true });
+}
+
+function openCalendar() {
+  calendarPanel.classList.add("open");
+  calendarScrim.hidden = false;
+}
+
+function closeCalendar() {
+  calendarPanel.classList.remove("open");
+  calendarScrim.hidden = true;
 }
 
 function keepComposerFocused() {
@@ -432,6 +559,10 @@ messageInput.addEventListener("keydown", (event) => {
 });
 
 notifyButton.addEventListener("click", requestNotifications);
+menuButton.addEventListener("click", openCalendar);
+closeCalendarButton.addEventListener("click", closeCalendar);
+calendarScrim.addEventListener("click", closeCalendar);
+todayButton.addEventListener("click", () => selectDate(getLocalDateKey()));
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
