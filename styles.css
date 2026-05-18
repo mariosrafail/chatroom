@@ -433,6 +433,10 @@ button {
   display: grid;
   gap: 2px;
   transform-origin: bottom left;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .message.grouped {
@@ -478,6 +482,8 @@ button {
   transition:
     transform 160ms ease,
     filter 160ms ease;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .message.continues .bubble::after {

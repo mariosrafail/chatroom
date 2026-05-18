@@ -318,9 +318,9 @@ function renderMessages() {
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     bubble.textContent = message.text;
-    attachMessageActions(bubble, message);
 
     item.append(bubble);
+    attachMessageActions(item, message);
 
     if (message.editedAt) {
       const edited = document.createElement("button");
@@ -375,13 +375,16 @@ function renderTypingIndicator() {
 }
 
 function attachMessageActions(element, message) {
+  const canOpenActions = (event) => !event.target.closest("button, a, input, textarea, select");
+
   element.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) {
+    if (event.button !== 0 || !canOpenActions(event)) {
       return;
     }
 
     window.clearTimeout(longPressTimer);
     longPressTimer = window.setTimeout(() => {
+      event.preventDefault();
       showMessageMenu(message, event.clientX, event.clientY);
     }, 520);
   });
@@ -390,10 +393,18 @@ function attachMessageActions(element, message) {
   element.addEventListener("pointercancel", () => window.clearTimeout(longPressTimer));
   element.addEventListener("pointerleave", () => window.clearTimeout(longPressTimer));
   element.addEventListener("contextmenu", (event) => {
+    if (!canOpenActions(event)) {
+      return;
+    }
+
     event.preventDefault();
     showMessageMenu(message, event.clientX, event.clientY);
   });
   element.addEventListener("dblclick", (event) => {
+    if (!canOpenActions(event)) {
+      return;
+    }
+
     showMessageMenu(message, event.clientX, event.clientY);
   });
 }
