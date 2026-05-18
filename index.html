@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="el">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Chat Room</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="chat-app" aria-label="Chat room">
+        <header class="topbar">
+          <button class="icon-button" id="menuButton" aria-label="Δωμάτια">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div class="room-title">
+            <span id="activeRoom">General</span>
+            <small><span class="status-dot"></span> online room</small>
+          </div>
+          <button class="avatar-button" id="profileButton" aria-label="Προφίλ">
+            <span id="avatarInitial">M</span>
+          </button>
+        </header>
+
+        <aside class="rooms-panel" id="roomsPanel" aria-label="Λίστα δωματίων">
+          <div class="panel-head">
+            <strong>Rooms</strong>
+            <button class="icon-button compact" id="closeRoomsButton" aria-label="Κλείσιμο">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <button class="room-option active" data-room="General">
+            <span># General</span>
+            <small>όλα τα νέα</small>
+          </button>
+          <button class="room-option" data-room="Random">
+            <span># Random</span>
+            <small>χαλαρή κουβέντα</small>
+          </button>
+          <button class="room-option" data-room="Support">
+            <span># Support</span>
+            <small>βοήθεια</small>
+          </button>
+        </aside>
+
+        <section class="messages" id="messages" aria-live="polite"></section>
+
+        <form class="composer" id="messageForm">
+          <button class="icon-button" type="button" id="quickButton" aria-label="Γρήγορο μήνυμα">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m12 3-1.9 5.8H4l5 3.6-1.9 5.8 4.9-3.6 5 3.6-1.9-5.8 4.9-3.6h-6.1L12 3Z" />
+            </svg>
+          </button>
+          <label class="sr-only" for="messageInput">Μήνυμα</label>
+          <textarea id="messageInput" rows="1" placeholder="Γράψε μήνυμα..." autocomplete="off"></textarea>
+          <button class="send-button" type="submit" aria-label="Αποστολή">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <dialog class="profile-dialog" id="profileDialog">
+      <form method="dialog" class="profile-card" id="profileForm">
+        <div>
+          <h1>Προφίλ</h1>
+          <p>Το όνομα φαίνεται στα μηνύματα που γράφεις από αυτή τη συσκευή.</p>
+        </div>
+        <label>
+          Όνομα
+          <input id="nameInput" maxlength="24" placeholder="Το όνομά σου" />
+        </label>
+        <div class="dialog-actions">
+          <button class="secondary-button" type="button" id="cancelProfileButton">Άκυρο</button>
+          <button class="primary-button" id="saveProfileButton" value="default">Αποθήκευση</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
