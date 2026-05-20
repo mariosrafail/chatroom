@@ -570,6 +570,8 @@ textarea:focus-visible {
   display: block;
   overflow: visible;
   filter: drop-shadow(0 8px 18px rgba(124, 58, 237, 0.12));
+  animation: heartPulse 1150ms var(--ease) infinite;
+  transform-origin: 50% 56%;
 }
 
 .heart-loader-outline {
@@ -1176,6 +1178,17 @@ textarea:focus-visible {
   55%,
   100% {
     transform: translateY(0);
+  }
+}
+
+@keyframes heartPulse {
+  0%,
+  100% {
+    transform: scale(0.96);
+  }
+
+  48% {
+    transform: scale(1.08);
   }
 }
 

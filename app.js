@@ -575,7 +575,7 @@ async function fetchMessages({ showLoading = false, older = false } = {}) {
     state.loading = false;
     state.loadingOlder = false;
     render({ scroll: older ? "keep-top" : shouldStickToBottom ? "bottom" : "preserve" });
-    if (isTodayActive()) {
+    if (isTodayActive() && state.hasMoreMessages) {
       ensureScrollableHistory();
     }
   }
@@ -908,7 +908,7 @@ async function saveEditedMessage() {
     }
 
     editDialog.close();
-    await fetchMessages();
+    await fetchMessagesForDate(state.activeDate);
   } catch {
     showToast("Could not edit message.");
   }
@@ -946,7 +946,7 @@ async function deleteSelectedMessage() {
     state.messages = state.messages.filter((message) => message.id !== selectedMessage.id);
     selectedMessage = null;
     render();
-    fetchMessages();
+    fetchMessagesForDate(state.activeDate);
   } catch {
     showToast("Could not delete message.");
   }
@@ -1034,7 +1034,7 @@ function showIncomingNotification(message) {
 
 async function addMessage(text) {
   if (!isTodayActive()) {
-    selectDate(getLocalDateKey());
+    selectToday();
     return;
   }
 
@@ -1105,6 +1105,10 @@ function selectDate(dateKey) {
   state.activeDate = dateKey;
   closeCalendar();
   fetchMessagesForDate(dateKey);
+}
+
+function selectToday() {
+  selectDate(getLocalDateKey());
 }
 
 function openCalendar() {
@@ -1317,7 +1321,7 @@ profileForm.addEventListener("submit", (event) => {
   profileDialog.close();
   render();
   resizeInput();
-  fetchMessages();
+  fetchMessagesForDate(state.activeDate);
 });
 
 messageForm.addEventListener("submit", (event) => {
@@ -1376,7 +1380,7 @@ notifyButton?.addEventListener("click", requestNotifications);
 menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
 calendarScrim.addEventListener("click", closeCalendar);
-todayButton.addEventListener("click", () => selectDate(getLocalDateKey()));
+todayButton.addEventListener("click", selectToday);
 editMessageButton.addEventListener("click", openEditDialog);
 deleteMessageButton.addEventListener("click", deleteSelectedMessage);
 cancelEditButton.addEventListener("click", () => editDialog.close());
@@ -1407,7 +1411,7 @@ if ("serviceWorker" in navigator) {
 resizeInput();
 updateSunTheme();
 render();
-fetchMessages({ showLoading: true });
+fetchMessagesForDate(getLocalDateKey());
 setInterval(() => fetchMessages(), pollMs);
 setInterval(updateSunTheme, 60000);
 
