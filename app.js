@@ -1021,6 +1021,11 @@ function showIncomingNotification(message) {
 }
 
 async function addMessage(text) {
+  if (!isTodayActive()) {
+    selectDate(getLocalDateKey());
+    return;
+  }
+
   if (!state.profileName) {
     openProfileDialog({ required: true });
     return;
@@ -1178,9 +1183,11 @@ function resizeInput() {
 }
 
 function renderComposerState() {
-  messageInput.disabled = false;
+  const canSendToday = isTodayActive();
+  messageForm.hidden = !canSendToday;
+  messageInput.disabled = !canSendToday;
   messageInput.placeholder = "Write a message...";
-  sendButton.disabled = !state.profileName || cleanMessageText(messageInput.value).length === 0;
+  sendButton.disabled = !canSendToday || !state.profileName || cleanMessageText(messageInput.value).length === 0;
 }
 
 function openProfileDialog({ required = false } = {}) {
