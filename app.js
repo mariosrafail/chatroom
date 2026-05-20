@@ -261,7 +261,7 @@ function renderNotificationButton() {
 function renderMessages({ scroll = "preserve" } = {}) {
   const previousScrollHeight = messagesEl.scrollHeight;
   const previousScrollTop = messagesEl.scrollTop;
-  const isLoadingMessages = state.loading || state.loadingDate || state.loadingOlder;
+  const isLoadingMessages = state.loading || state.loadingOlder;
   const roomMessages = [...state.messages]
     .filter((message) => message.text.length > 0 && message.chatDate === state.activeDate)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -269,18 +269,12 @@ function renderMessages({ scroll = "preserve" } = {}) {
   messagesEl.dataset.activeDate = state.activeDate;
   messagesEl.replaceChildren();
 
-  if (isLoadingMessages) {
-    const loading = document.createElement("div");
-    loading.className = "day-chip";
-    loading.textContent = state.loadingOlder ? "Loading older..." : "Loading messages...";
-    messagesEl.append(loading);
+  if (state.loadingDate) {
+    messagesEl.append(createHeartLoader());
+    return;
   }
 
-  if (roomMessages.length === 0) {
-    if (isLoadingMessages) {
-      return;
-    }
-
+  if (roomMessages.length === 0 && !isLoadingMessages) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.textContent = "No messages yet.";
@@ -361,6 +355,27 @@ function renderMessages({ scroll = "preserve" } = {}) {
   } else if (scroll === "preserve") {
     messagesEl.scrollTop = previousScrollTop;
   }
+}
+
+function createHeartLoader() {
+  const loader = document.createElement("div");
+  loader.className = "heart-loader-state";
+  loader.setAttribute("role", "status");
+  loader.setAttribute("aria-label", "Loading messages");
+
+  loader.innerHTML = `
+    <svg class="heart-loader-icon" viewBox="0 0 64 58" aria-hidden="true">
+      <defs>
+        <clipPath id="heartLoaderClip">
+          <path d="M32 54S6 38 6 18C6 7 19 3 26 12c2 3 4 5 6 8 2-3 4-5 6-8 7-9 20-5 20 6 0 20-26 36-26 36Z" />
+        </clipPath>
+      </defs>
+      <rect class="heart-loader-fill" x="0" y="0" width="64" height="58" clip-path="url(#heartLoaderClip)" />
+      <path class="heart-loader-outline" d="M32 54S6 38 6 18C6 7 19 3 26 12c2 3 4 5 6 8 2-3 4-5 6-8 7-9 20-5 20 6 0 20-26 36-26 36Z" />
+    </svg>
+  `;
+
+  return loader;
 }
 
 function renderTypingIndicator() {
@@ -570,7 +585,7 @@ async function fetchMessagesForDate(dateKey) {
   const requestId = ++dateRequestId;
   state.loadingDate = true;
   state.hasMoreMessages = false;
-  render({ scroll: "top" });
+  render({ scroll: "none" });
 
   try {
     const params = new URLSearchParams({

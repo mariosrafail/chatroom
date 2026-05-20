@@ -556,6 +556,34 @@ textarea:focus-visible {
   animation: sectionRise 260ms var(--spring) both;
 }
 
+.heart-loader-state {
+  flex: 1;
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  color: var(--brand-mark);
+}
+
+.heart-loader-icon {
+  width: 64px;
+  height: 58px;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 8px 18px rgba(124, 58, 237, 0.12));
+}
+
+.heart-loader-outline {
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+}
+
+.heart-loader-fill {
+  fill: #ff2f68;
+  animation: heartFill 1150ms var(--ease) infinite;
+}
+
 .message {
   width: fit-content;
   max-width: min(84%, 392px);
@@ -1137,6 +1165,17 @@ textarea:focus-visible {
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes heartFill {
+  0% {
+    transform: translateY(58px);
+  }
+
+  55%,
+  100% {
+    transform: translateY(0);
   }
 }
 
