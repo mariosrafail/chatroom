@@ -55,7 +55,7 @@ function cleanLimit(value) {
     return 5;
   }
 
-  return Math.min(50, Math.max(1, limit));
+  return Math.min(1000, Math.max(1, limit));
 }
 
 async function ensureSchema(db) {
@@ -249,7 +249,7 @@ exports.handler = async (event) => {
         WHERE room = ${room}
           AND chat_date = ${chatDate}::date
         ORDER BY created_at DESC
-        LIMIT 100
+        LIMIT ${queryLimit}
       ) m
       LEFT JOIN message_reads r ON r.message_id = m.id
       LEFT JOIN message_edits e ON e.message_id = m.id

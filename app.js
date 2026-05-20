@@ -9,6 +9,11 @@ const todayDate = getLocalDateKey();
 const typingIdleMs = 4200;
 const typingThrottleMs = 1800;
 const messagePageSize = 5;
+const dayMessageLimit = 1000;
+const menuSwipeEdgePx = 32;
+const menuSwipeOpenDistancePx = 70;
+const menuSwipeCloseDistancePx = 60;
+const menuSwipeVerticalTolerancePx = 45;
 const themeLocation = { latitude: 37.9838, longitude: 23.7275 };
 
 const fallbackMessages = [
@@ -41,6 +46,7 @@ const state = {
   sun: null,
   online: false,
   loading: false,
+  loadingDate: false,
   loadingOlder: false,
   hasMoreMessages: true,
   messages: structuredClone(fallbackMessages),
@@ -87,6 +93,10 @@ let longPressTimer = null;
 let lastTypingSentAt = 0;
 let typingStopTimer = null;
 let historyTouchStartY = 0;
+let dateRequestId = 0;
+let menuSwipeStartX = 0;
+let menuSwipeStartY = 0;
+let menuSwipeTracking = false;
 
 function loadProfileName() {
   const saved = readStoredProfileName();
@@ -244,20 +254,26 @@ function renderNotificationButton() {
 function renderMessages({ scroll = "preserve" } = {}) {
   const previousScrollHeight = messagesEl.scrollHeight;
   const previousScrollTop = messagesEl.scrollTop;
+  const isLoadingMessages = state.loading || state.loadingDate || state.loadingOlder;
   const roomMessages = [...state.messages]
-    .filter((message) => message.text.length > 0)
+    .filter((message) => message.text.length > 0 && message.chatDate === state.activeDate)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   const latestOwnMessage = [...roomMessages].reverse().find((message) => message.author === state.profileName);
+  messagesEl.dataset.activeDate = state.activeDate;
   messagesEl.replaceChildren();
 
-  if (state.loading || state.loadingOlder) {
+  if (isLoadingMessages) {
     const loading = document.createElement("div");
     loading.className = "day-chip";
-    loading.textContent = state.loadingOlder ? "Loading older..." : "Loading...";
+    loading.textContent = state.loadingOlder ? "Loading older..." : "Loading messages...";
     messagesEl.append(loading);
   }
 
   if (roomMessages.length === 0) {
+    if (isLoadingMessages) {
+      return;
+    }
+
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.textContent = "No messages yet.";
@@ -270,7 +286,6 @@ function renderMessages({ scroll = "preserve" } = {}) {
     const isLatestOwn = latestOwnMessage?.id === message.id;
     const previousMessage = roomMessages[index - 1];
     const nextMessage = roomMessages[index + 1];
-    const isPastDay = message.chatDate !== getLocalDateKey();
     const groupedWithPrevious = isGroupedMessage(previousMessage, message);
     const continuesGroup = isGroupedMessage(message, nextMessage);
 
@@ -278,7 +293,9 @@ function renderMessages({ scroll = "preserve" } = {}) {
       const dayChip = document.createElement("div");
       dayChip.className = "day-chip";
       dayChip.dataset.date = message.chatDate;
-      dayChip.textContent = formatFullDate(message.chatDate);
+      dayChip.textContent = `${formatFullDate(message.chatDate)} · ${roomMessages.length} message${
+        roomMessages.length === 1 ? "" : "s"
+      }`;
       messagesEl.append(dayChip);
     }
 
@@ -286,7 +303,6 @@ function renderMessages({ scroll = "preserve" } = {}) {
     item.className = `message ${isMine ? "mine" : "theirs"}`;
     item.classList.toggle("grouped", groupedWithPrevious);
     item.classList.toggle("continues", continuesGroup);
-    item.classList.toggle("past-day", isPastDay);
     if (!renderedMessageIds.has(message.id)) {
       item.classList.add("new-message");
     }
@@ -331,6 +347,8 @@ function renderMessages({ scroll = "preserve" } = {}) {
 
   if (scroll === "bottom") {
     messagesEl.scrollTop = messagesEl.scrollHeight;
+  } else if (scroll === "top") {
+    messagesEl.scrollTop = 0;
   } else if (scroll === "keep-top") {
     messagesEl.scrollTop = messagesEl.scrollHeight - previousScrollHeight + previousScrollTop;
   } else if (scroll === "preserve") {
@@ -339,7 +357,7 @@ function renderMessages({ scroll = "preserve" } = {}) {
 }
 
 function renderTypingIndicator() {
-  if (state.typingUsers.length === 0) {
+  if (state.typingUsers.length === 0 || !isTodayActive()) {
     return;
   }
 
@@ -477,6 +495,7 @@ async function fetchMessages({ showLoading = false, older = false } = {}) {
   }
 
   const wasNearBottom = isNearMessageBottom();
+  const shouldStickToBottom = isTodayActive() && (wasNearBottom || showLoading);
   if (showLoading) {
     state.loading = true;
     render();
@@ -534,8 +553,58 @@ async function fetchMessages({ showLoading = false, older = false } = {}) {
   } finally {
     state.loading = false;
     state.loadingOlder = false;
-    render({ scroll: older ? "keep-top" : wasNearBottom || showLoading ? "bottom" : "preserve" });
-    ensureScrollableHistory();
+    render({ scroll: older ? "keep-top" : shouldStickToBottom ? "bottom" : "preserve" });
+    if (isTodayActive()) {
+      ensureScrollableHistory();
+    }
+  }
+}
+
+async function fetchMessagesForDate(dateKey) {
+  const requestId = ++dateRequestId;
+  state.loadingDate = true;
+  state.hasMoreMessages = false;
+  render({ scroll: "top" });
+
+  try {
+    const params = new URLSearchParams({
+      room: state.activeRoom,
+      date: dateKey,
+      limit: String(dayMessageLimit),
+    });
+    if (state.profileName) {
+      params.set("viewer", state.profileName);
+    }
+
+    const response = await fetch(`${apiUrl}?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error("Day message fetch failed");
+    }
+
+    const data = await response.json();
+    if (requestId !== dateRequestId || state.activeDate !== dateKey) {
+      return;
+    }
+
+    const nextMessages = data.messages.map(normalizeMessage);
+    state.messages = state.messages.filter((message) => message.chatDate !== dateKey);
+    mergeMessages(nextMessages);
+    state.availableDays = normalizeDays(data.days);
+    state.typingUsers =
+      dateKey === getLocalDateKey() && Array.isArray(data.typing)
+        ? data.typing.filter((name) => name !== state.profileName)
+        : [];
+    nextMessages.forEach((message) => knownRemoteMessageIds.add(message.id));
+    hasLoadedRemoteMessages = true;
+    state.online = true;
+  } catch {
+    state.online = false;
+    showToast("Could not load that day.");
+  } finally {
+    if (requestId === dateRequestId) {
+      state.loadingDate = false;
+      render({ scroll: "top" });
+    }
   }
 }
 
@@ -1018,15 +1087,7 @@ async function addMessage(text) {
 function selectDate(dateKey) {
   state.activeDate = dateKey;
   closeCalendar();
-  render();
-  const dayMarker = messagesEl.querySelector(`[data-date="${dateKey}"]`);
-  if (dayMarker) {
-    dayMarker.scrollIntoView({ block: "start" });
-  } else if (dateKey === getLocalDateKey()) {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  } else {
-    fetchMessages({ older: true });
-  }
+  fetchMessagesForDate(dateKey);
 }
 
 function openCalendar() {
@@ -1039,8 +1100,52 @@ function closeCalendar() {
   calendarScrim.hidden = true;
 }
 
+function handleMenuSwipeStart(event) {
+  if (event.touches.length !== 1 || event.target.closest("button, input, textarea, select, dialog, .message-menu")) {
+    menuSwipeTracking = false;
+    return;
+  }
+
+  const touch = event.touches[0];
+  const menuIsOpen = calendarPanel.classList.contains("open");
+  const startsAtLeftEdge = touch.clientX <= menuSwipeEdgePx;
+  const startsInPanel = menuIsOpen && calendarPanel.contains(event.target);
+
+  menuSwipeTracking = startsAtLeftEdge || startsInPanel;
+  menuSwipeStartX = touch.clientX;
+  menuSwipeStartY = touch.clientY;
+}
+
+function handleMenuSwipeMove(event) {
+  if (!menuSwipeTracking || event.touches.length !== 1) {
+    return;
+  }
+
+  const touch = event.touches[0];
+  const deltaX = touch.clientX - menuSwipeStartX;
+  const deltaY = Math.abs(touch.clientY - menuSwipeStartY);
+  const menuIsOpen = calendarPanel.classList.contains("open");
+
+  if (deltaY > menuSwipeVerticalTolerancePx) {
+    menuSwipeTracking = false;
+    return;
+  }
+
+  if (!menuIsOpen && deltaX > menuSwipeOpenDistancePx) {
+    openCalendar();
+    menuSwipeTracking = false;
+  } else if (menuIsOpen && deltaX < -menuSwipeCloseDistancePx) {
+    closeCalendar();
+    menuSwipeTracking = false;
+  }
+}
+
+function handleMenuSwipeEnd() {
+  menuSwipeTracking = false;
+}
+
 function canLoadOlderMessages() {
-  return !state.loading && !state.loadingOlder && state.hasMoreMessages;
+  return isTodayActive() && !state.loading && !state.loadingDate && !state.loadingOlder && state.hasMoreMessages;
 }
 
 function loadOlderMessagesIfNeeded({ force = false } = {}) {
@@ -1164,6 +1269,10 @@ messagesEl.addEventListener(
   },
   { passive: true }
 );
+document.addEventListener("touchstart", handleMenuSwipeStart, { passive: true });
+document.addEventListener("touchmove", handleMenuSwipeMove, { passive: true });
+document.addEventListener("touchend", handleMenuSwipeEnd, { passive: true });
+document.addEventListener("touchcancel", handleMenuSwipeEnd, { passive: true });
 notifyButton.addEventListener("click", requestNotifications);
 menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
