@@ -5,29 +5,29 @@
   --twilight-opacity: 0;
 
   /* Core palette */
-  --bg: #f5f6f8;
-  --bg-deep: #e9edf2;
+  --bg: #f8f3ff;
+  --bg-deep: #eee4fb;
   --surface: #ffffff;
   --surface-solid: #ffffff;
   --surface-strong: #ffffff;
-  --surface-soft: #f6f8fb;
-  --text: #172033;
-  --text-strong: #07111f;
-  --muted: #65738a;
-  --line: #d5dce6;
-  --line-strong: #aeb9c8;
+  --surface-soft: #fbf7ff;
+  --text: #241b33;
+  --text-strong: #16091f;
+  --muted: #7a668b;
+  --line: #e2d4ed;
+  --line-strong: #cbb4da;
 
   /* Accent system */
-  --primary: #1769ff;
-  --primary-strong: #0f4fd1;
-  --primary-soft: rgba(23, 105, 255, 0.13);
-  --accent: #00a676;
-  --accent-warm: #ff3f6c;
+  --primary: #7c3aed;
+  --primary-strong: #5b21b6;
+  --primary-soft: rgba(124, 58, 237, 0.14);
+  --accent: #d946ef;
+  --accent-warm: #ff4f8b;
   --danger: #ff453a;
-  --brand-ink: #111827;
-  --brand-panel: #f0f4ff;
-  --brand-mark: #ff3f6c;
-  --mine: #1769ff;
+  --brand-ink: #3b0a57;
+  --brand-panel: #f2e7ff;
+  --brand-mark: #ff4f8b;
+  --mine: #7c3aed;
   --theirs: #ffffff;
 
   /* Flat surfaces and subtle depth */
@@ -36,12 +36,12 @@
   --glass-border: var(--line);
   --composer: #ffffff;
   --field-bg: #ffffff;
-  --field-text: #101828;
-  --field-placeholder: #8a97aa;
+  --field-text: #241b33;
+  --field-placeholder: #9a86aa;
   --menu-surface: #ffffff;
-  --shadow-soft: 0 1px 0 rgba(17, 24, 39, 0.06);
-  --shadow-medium: 0 2px 0 rgba(17, 24, 39, 0.07);
-  --shadow-strong: 0 3px 0 rgba(17, 24, 39, 0.08);
+  --shadow-soft: 0 1px 0 rgba(59, 10, 87, 0.07);
+  --shadow-medium: 0 2px 0 rgba(59, 10, 87, 0.08);
+  --shadow-strong: 0 3px 0 rgba(59, 10, 87, 0.1);
   --inset-highlight: none;
 
   /* Shape, motion, layout */
@@ -54,42 +54,46 @@
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --tap-scale: 0.965;
 
+  --romance-day-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='260' viewBox='0 0 220 260'%3E%3Cpath d='M38 42c0-13 15-17 23-6 8-11 23-7 23 6 0 17-23 31-23 31S38 59 38 42Z' fill='none' stroke='%23ff4f8b' stroke-opacity='.17' stroke-width='2.2'/%3E%3Cpath d='M142 151c0-10 12-13 18-5 6-8 18-5 18 5 0 13-18 24-18 24s-18-11-18-24Z' fill='none' stroke='%237c3aed' stroke-opacity='.14' stroke-width='2'/%3E%3Cellipse cx='92' cy='191' rx='5' ry='15' fill='%23d946ef' fill-opacity='.1' transform='rotate(-28 92 191)'/%3E%3C/svg%3E");
+  --romance-night-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='260' viewBox='0 0 220 260'%3E%3Cpath d='M38 42c0-13 15-17 23-6 8-11 23-7 23 6 0 17-23 31-23 31S38 59 38 42Z' fill='none' stroke='%23ff9fc0' stroke-opacity='.16' stroke-width='2.2'/%3E%3Cpath d='M142 151c0-10 12-13 18-5 6-8 18-5 18 5 0 13-18 24-18 24s-18-11-18-24Z' fill='none' stroke='%23c4a2ff' stroke-opacity='.15' stroke-width='2'/%3E%3Cellipse cx='92' cy='191' rx='5' ry='15' fill='%23f0abfc' fill-opacity='.1' transform='rotate(-28 92 191)'/%3E%3C/svg%3E");
+  --chat-romance-pattern: var(--romance-day-pattern);
 }
 
 body.night-mode {
   color-scheme: dark;
-  --bg: #101624;
-  --bg-deep: #070b14;
-  --surface: #171d2b;
-  --surface-solid: #171d2b;
-  --surface-strong: #20283a;
-  --surface-soft: #141b29;
-  --text: #eef4ff;
+  --bg: #17091f;
+  --bg-deep: #0b0611;
+  --surface: #21122b;
+  --surface-solid: #21122b;
+  --surface-strong: #2e1a3d;
+  --surface-soft: #190d24;
+  --text: #fbf3ff;
   --text-strong: #ffffff;
-  --muted: #a9b5c8;
+  --muted: #cdb7da;
   --line: rgba(255, 255, 255, 0.12);
   --line-strong: rgba(255, 255, 255, 0.2);
-  --primary: #5eb1ff;
-  --primary-strong: #0a84ff;
-  --primary-soft: rgba(94, 177, 255, 0.17);
-  --accent: #58e87b;
-  --accent-warm: #ff6d9d;
-  --brand-ink: #315cff;
-  --brand-panel: #121d33;
-  --brand-mark: #ff6d9d;
-  --theirs: #242d3f;
-  --glass: #171d2b;
-  --glass-strong: #20283a;
+  --primary: #c084fc;
+  --primary-strong: #9333ea;
+  --primary-soft: rgba(192, 132, 252, 0.18);
+  --accent: #f0abfc;
+  --accent-warm: #ff7aa8;
+  --brand-ink: #7e22ce;
+  --brand-panel: #2a1538;
+  --brand-mark: #ff7aa8;
+  --theirs: #2e1a3d;
+  --glass: #21122b;
+  --glass-strong: #2e1a3d;
   --glass-border: var(--line);
-  --composer: #171d2b;
-  --field-bg: #0f1625;
+  --composer: #21122b;
+  --field-bg: #160b20;
   --field-text: #ffffff;
-  --field-placeholder: #93a1b8;
-  --menu-surface: #20283a;
+  --field-placeholder: #bfa5cf;
+  --menu-surface: #2e1a3d;
   --shadow-soft: 0 1px 1px rgba(0, 0, 0, 0.16);
   --shadow-medium: 0 2px 8px rgba(0, 0, 0, 0.22);
   --shadow-strong: 0 4px 16px rgba(0, 0, 0, 0.28);
   --inset-highlight: none;
+  --chat-romance-pattern: var(--romance-night-pattern);
 }
 
 * {
@@ -135,16 +139,13 @@ body::before {
   z-index: -2;
   opacity: var(--day-opacity);
   background:
-    linear-gradient(90deg, rgba(23, 105, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 63, 108, 0.05) 1px, transparent 1px),
+    var(--romance-day-pattern),
     var(--bg-deep);
   background-position:
-    0 0,
-    0 0,
+    18px 14px,
     0 0;
   background-size:
-    44px 44px,
-    44px 44px,
+    220px 260px,
     auto;
 }
 
@@ -152,16 +153,13 @@ body::after {
   z-index: -1;
   opacity: var(--night-opacity);
   background:
-    linear-gradient(90deg, rgba(94, 177, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 109, 157, 0.06) 1px, transparent 1px),
+    var(--romance-night-pattern),
     var(--bg-deep);
   background-position:
-    0 0,
-    0 0,
+    18px 14px,
     0 0;
   background-size:
-    44px 44px,
-    44px 44px,
+    220px 260px,
     auto;
 }
 
@@ -519,16 +517,13 @@ textarea:focus-visible {
   flex-direction: column;
   gap: 7px;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px),
-    linear-gradient(0deg, color-mix(in srgb, var(--brand-mark) 6%, transparent) 1px, transparent 1px),
+    var(--chat-romance-pattern),
     var(--surface-soft);
   background-position:
     0 0,
-    0 0,
-    0 0;
+    18px 12px;
   background-size:
-    40px 40px,
-    40px 40px,
+    auto,
     220px 260px;
   scroll-behavior: smooth;
   overscroll-behavior: contain;
