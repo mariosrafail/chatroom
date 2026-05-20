@@ -14,6 +14,7 @@ const menuSwipeEdgePx = 32;
 const menuSwipeOpenDistancePx = 70;
 const menuSwipeCloseDistancePx = 60;
 const menuSwipeVerticalTolerancePx = 45;
+const menuSwipeIntentPx = 8;
 const themeLocation = { latitude: 37.9838, longitude: 23.7275 };
 
 const fallbackMessages = [
@@ -79,7 +80,6 @@ const calendarScrim = document.querySelector("#calendarScrim");
 const dayList = document.querySelector("#dayList");
 const todayButton = document.querySelector("#todayButton");
 const messageMenu = document.querySelector("#messageMenu");
-const copyMessageButton = document.querySelector("#copyMessageButton");
 const editMessageButton = document.querySelector("#editMessageButton");
 const deleteMessageButton = document.querySelector("#deleteMessageButton");
 const editDialog = document.querySelector("#editDialog");
@@ -96,7 +96,10 @@ let historyTouchStartY = 0;
 let dateRequestId = 0;
 let menuSwipeStartX = 0;
 let menuSwipeStartY = 0;
+let menuSwipeStartProgress = 0;
+let menuSwipePanelWidth = 0;
 let menuSwipeTracking = false;
+let menuSwipeDragging = false;
 
 function loadProfileName() {
   const saved = readStoredProfileName();
@@ -440,7 +443,6 @@ function isGroupedMessage(firstMessage, secondMessage) {
 }
 
 function render(options = {}) {
-  closeMessageMenu();
   renderHeader();
   renderMessages(options);
   renderComposerState();
@@ -827,6 +829,12 @@ function canModifyMessage(message) {
 function showMessageMenu(message, x, y) {
   selectedMessage = message;
   const canModify = canModifyMessage(message);
+
+  if (!canModify) {
+    closeMessageMenu();
+    return;
+  }
+
   editMessageButton.hidden = !canModify;
   deleteMessageButton.hidden = !canModify;
 
@@ -841,21 +849,6 @@ function showMessageMenu(message, x, y) {
 
 function closeMessageMenu() {
   messageMenu.hidden = true;
-}
-
-async function copySelectedMessage() {
-  if (!selectedMessage) {
-    return;
-  }
-
-  try {
-    await navigator.clipboard.writeText(selectedMessage.text);
-    showToast("Copied.");
-  } catch {
-    showToast("Copy failed.");
-  } finally {
-    closeMessageMenu();
-  }
 }
 
 function openEditDialog() {
@@ -1100,29 +1093,71 @@ function selectDate(dateKey) {
 }
 
 function openCalendar() {
+  resetCalendarDragStyles();
   calendarPanel.classList.add("open");
   calendarScrim.hidden = false;
 }
 
 function closeCalendar() {
+  resetCalendarDragStyles();
   calendarPanel.classList.remove("open");
+  calendarScrim.hidden = true;
+}
+
+function resetCalendarDragStyles() {
+  calendarPanel.style.transform = "";
+  calendarPanel.style.transition = "";
+  calendarScrim.style.opacity = "";
+}
+
+function getCalendarOpenProgress() {
+  return calendarPanel.classList.contains("open") ? 1 : 0;
+}
+
+function setCalendarDragProgress(progress) {
+  const nextProgress = Math.min(1, Math.max(0, progress));
+  const translatePercent = (nextProgress - 1) * 100;
+
+  calendarScrim.hidden = nextProgress <= 0;
+  calendarScrim.style.opacity = String(nextProgress);
+  calendarPanel.style.transition = "none";
+  calendarPanel.style.transform = `translateX(${translatePercent}%)`;
+}
+
+function settleCalendarDrag(shouldOpen) {
+  calendarPanel.style.transition = "";
+  calendarScrim.style.opacity = "";
+
+  if (shouldOpen) {
+    calendarPanel.classList.add("open");
+    calendarScrim.hidden = false;
+    calendarPanel.style.transform = "";
+    return;
+  }
+
+  calendarPanel.classList.remove("open");
+  calendarPanel.style.transform = "";
   calendarScrim.hidden = true;
 }
 
 function handleMenuSwipeStart(event) {
   if (event.touches.length !== 1 || event.target.closest("button, input, textarea, select, dialog, .message-menu")) {
     menuSwipeTracking = false;
+    menuSwipeDragging = false;
     return;
   }
 
   const touch = event.touches[0];
-  const menuIsOpen = calendarPanel.classList.contains("open");
+  const menuIsOpen = getCalendarOpenProgress() === 1;
   const startsAtLeftEdge = touch.clientX <= menuSwipeEdgePx;
   const startsInPanel = menuIsOpen && calendarPanel.contains(event.target);
 
   menuSwipeTracking = startsAtLeftEdge || startsInPanel;
+  menuSwipeDragging = false;
   menuSwipeStartX = touch.clientX;
   menuSwipeStartY = touch.clientY;
+  menuSwipeStartProgress = getCalendarOpenProgress();
+  menuSwipePanelWidth = calendarPanel.getBoundingClientRect().width || 356;
 }
 
 function handleMenuSwipeMove(event) {
@@ -1132,25 +1167,63 @@ function handleMenuSwipeMove(event) {
 
   const touch = event.touches[0];
   const deltaX = touch.clientX - menuSwipeStartX;
-  const deltaY = Math.abs(touch.clientY - menuSwipeStartY);
-  const menuIsOpen = calendarPanel.classList.contains("open");
+  const absDeltaX = Math.abs(deltaX);
+  const absDeltaY = Math.abs(touch.clientY - menuSwipeStartY);
 
-  if (deltaY > menuSwipeVerticalTolerancePx) {
+  if (!menuSwipeDragging && absDeltaY > menuSwipeVerticalTolerancePx && absDeltaY > absDeltaX) {
     menuSwipeTracking = false;
+    menuSwipeDragging = false;
+    resetCalendarDragStyles();
     return;
   }
 
-  if (!menuIsOpen && deltaX > menuSwipeOpenDistancePx) {
-    openCalendar();
-    menuSwipeTracking = false;
-  } else if (menuIsOpen && deltaX < -menuSwipeCloseDistancePx) {
-    closeCalendar();
-    menuSwipeTracking = false;
+  if (!menuSwipeDragging) {
+    if (absDeltaX < menuSwipeIntentPx) {
+      return;
+    }
+
+    if (absDeltaY > absDeltaX) {
+      menuSwipeTracking = false;
+      return;
+    }
+
+    menuSwipeDragging = true;
   }
+
+  if (event.cancelable) {
+    event.preventDefault();
+  }
+
+  setCalendarDragProgress(menuSwipeStartProgress + deltaX / menuSwipePanelWidth);
 }
 
 function handleMenuSwipeEnd() {
+  if (menuSwipeDragging) {
+    const progress = getCalendarOpenProgressFromStyle();
+    const distance = (progress - menuSwipeStartProgress) * menuSwipePanelWidth;
+    const shouldOpen =
+      progress > 0.5 ||
+      (menuSwipeStartProgress === 0 && distance > menuSwipeOpenDistancePx) ||
+      (menuSwipeStartProgress === 1 && distance > -menuSwipeCloseDistancePx);
+
+    settleCalendarDrag(shouldOpen);
+  }
+
   menuSwipeTracking = false;
+  menuSwipeDragging = false;
+}
+
+function getCalendarOpenProgressFromStyle() {
+  if (!calendarPanel.style.transform) {
+    return getCalendarOpenProgress();
+  }
+
+  const match = calendarPanel.style.transform.match(/translateX\((-?\d+(?:\.\d+)?)%\)/);
+  if (!match) {
+    return getCalendarOpenProgress();
+  }
+
+  return Math.min(1, Math.max(0, 1 + Number(match[1]) / 100));
 }
 
 function canLoadOlderMessages() {
@@ -1281,7 +1354,7 @@ messagesEl.addEventListener(
   { passive: true }
 );
 document.addEventListener("touchstart", handleMenuSwipeStart, { passive: true });
-document.addEventListener("touchmove", handleMenuSwipeMove, { passive: true });
+document.addEventListener("touchmove", handleMenuSwipeMove, { passive: false });
 document.addEventListener("touchend", handleMenuSwipeEnd, { passive: true });
 document.addEventListener("touchcancel", handleMenuSwipeEnd, { passive: true });
 notifyButton?.addEventListener("click", requestNotifications);
@@ -1289,7 +1362,6 @@ menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
 calendarScrim.addEventListener("click", closeCalendar);
 todayButton.addEventListener("click", () => selectDate(getLocalDateKey()));
-copyMessageButton.addEventListener("click", copySelectedMessage);
 editMessageButton.addEventListener("click", openEditDialog);
 deleteMessageButton.addEventListener("click", deleteSelectedMessage);
 cancelEditButton.addEventListener("click", () => editDialog.close());

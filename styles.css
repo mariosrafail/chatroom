@@ -254,17 +254,6 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
-.room-title::after {
-  content: "Private channel";
-  justify-self: center;
-  padding: 2px 7px;
-  border-left: 3px solid var(--brand-mark);
-  color: var(--muted);
-  background: var(--surface-soft);
-  font-size: 0.68rem;
-  font-weight: 760;
-}
-
 .icon-button,
 .avatar-button,
 .send-button {
