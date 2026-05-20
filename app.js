@@ -242,6 +242,10 @@ function renderHeader() {
 }
 
 function renderNotificationButton() {
+  if (!notifyButton) {
+    return;
+  }
+
   if (!("Notification" in window)) {
     notifyButton.hidden = true;
     return;
@@ -1280,7 +1284,7 @@ document.addEventListener("touchstart", handleMenuSwipeStart, { passive: true })
 document.addEventListener("touchmove", handleMenuSwipeMove, { passive: true });
 document.addEventListener("touchend", handleMenuSwipeEnd, { passive: true });
 document.addEventListener("touchcancel", handleMenuSwipeEnd, { passive: true });
-notifyButton.addEventListener("click", requestNotifications);
+notifyButton?.addEventListener("click", requestNotifications);
 menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
 calendarScrim.addEventListener("click", closeCalendar);
