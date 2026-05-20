@@ -569,6 +569,14 @@ textarea:focus-visible {
   will-change: transform, opacity;
 }
 
+.message,
+.message * {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .message.grouped {
   margin-top: -3px;
 }
@@ -614,6 +622,9 @@ textarea:focus-visible {
   cursor: default;
   transform: translateZ(0);
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   transition:
     transform 160ms var(--spring),
     background 180ms var(--ease);

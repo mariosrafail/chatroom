@@ -1374,6 +1374,16 @@ document.addEventListener("pointerdown", (event) => {
     closeMessageMenu();
   }
 });
+document.addEventListener("selectstart", (event) => {
+  if (event.target.closest(".message")) {
+    event.preventDefault();
+  }
+});
+document.addEventListener("dragstart", (event) => {
+  if (event.target.closest(".message")) {
+    event.preventDefault();
+  }
+});
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
