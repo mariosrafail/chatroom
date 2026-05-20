@@ -624,7 +624,7 @@ async function fetchMessagesForDate(dateKey) {
   } finally {
     if (requestId === dateRequestId) {
       state.loadingDate = false;
-      render({ scroll: "top" });
+      render({ scroll: dateKey === getLocalDateKey() ? "bottom" : "top" });
     }
   }
 }
