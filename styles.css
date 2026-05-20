@@ -302,7 +302,7 @@ textarea:focus-visible {
 .icon-button {
   color: var(--primary);
   background: var(--brand-panel);
-  border: 1px solid var(--line-strong);
+  border: 0;
   box-shadow: none;
 }
 
@@ -341,7 +341,7 @@ textarea:focus-visible {
   font-size: 1rem;
   font-weight: 850;
   background: var(--brand-ink);
-  border: 1px solid var(--brand-ink);
+  border: 0;
   box-shadow: none;
   text-shadow: none;
 }
@@ -370,7 +370,6 @@ textarea:focus-visible {
   grid-template-rows: auto auto 1fr auto;
   gap: 14px;
   background: var(--surface-solid);
-  border-right: 1px solid var(--glass-border);
   box-shadow: 3px 0 0 color-mix(in srgb, var(--primary) 20%, transparent);
   transform: translateX(calc(-100% - 20px));
   transition: transform 260ms var(--spring);
@@ -415,7 +414,7 @@ textarea:focus-visible {
 .day-option,
 .notify-row {
   width: 100%;
-  border: 1px solid var(--glass-border);
+  border: 0;
   color: var(--text);
   background: var(--surface-soft);
   box-shadow: none;
@@ -436,9 +435,8 @@ textarea:focus-visible {
 
 .today-button.active {
   color: #ffffff;
-  border-color: var(--primary);
   background: var(--primary);
-  box-shadow: inset 4px 0 0 var(--brand-mark);
+  box-shadow: none;
 }
 
 .day-list {
@@ -476,9 +474,8 @@ textarea:focus-visible {
 
 .day-option.active {
   color: #ffffff;
-  border-color: var(--primary);
   background: var(--primary);
-  box-shadow: inset 4px 0 0 var(--brand-mark);
+  box-shadow: none;
 }
 
 .day-option.active small {
@@ -542,7 +539,7 @@ textarea:focus-visible {
   z-index: 2;
   max-width: min(92%, 360px);
   padding: 6px 13px;
-  border: 1px solid var(--glass-border);
+  border: 0;
   border-radius: var(--radius-sm);
   margin-bottom: 8px;
   color: var(--muted);
@@ -559,7 +556,7 @@ textarea:focus-visible {
   width: min(290px, 100%);
   margin-top: 24px;
   padding: 16px 18px;
-  border: 1px solid var(--glass-border);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--surface-solid);
   color: var(--muted);
@@ -662,8 +659,6 @@ textarea:focus-visible {
   justify-self: end;
   color: #ffffff;
   background: var(--primary);
-  border: 1px solid var(--primary-strong);
-  border-right: 4px solid var(--brand-mark);
   border-bottom-right-radius: var(--radius-xs);
   box-shadow: none;
   text-shadow: none;
@@ -673,8 +668,6 @@ textarea:focus-visible {
   justify-self: start;
   color: var(--text);
   background: var(--theirs);
-  border: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
-  border-left: 4px solid var(--accent);
   border-bottom-left-radius: var(--radius-xs);
   box-shadow: none;
 }
@@ -759,7 +752,7 @@ textarea:focus-visible {
   z-index: 20;
   min-width: 170px;
   padding: 7px;
-  border: 1px solid var(--glass-border);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--menu-surface);
   box-shadow: var(--shadow-soft);
@@ -815,7 +808,7 @@ textarea:focus-visible {
   max-height: 138px;
   min-height: 46px;
   resize: none;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-md);
   padding: 11px 15px;
   color: var(--field-text);
@@ -832,9 +825,8 @@ textarea:focus-visible {
 }
 
 .composer textarea:focus {
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--line));
   background: var(--surface-solid);
-  box-shadow: inset 4px 0 0 var(--brand-mark);
+  box-shadow: none;
 }
 
 .composer textarea::placeholder,
@@ -848,7 +840,7 @@ textarea:focus-visible {
   height: 46px;
   color: #ffffff;
   background: var(--primary);
-  border: 1px solid var(--primary);
+  border: 0;
   box-shadow: none;
 }
 
@@ -863,7 +855,7 @@ textarea:focus-visible {
 .profile-dialog {
   width: min(92vw, 402px);
   padding: 0;
-  border: 1px solid var(--glass-border);
+  border: 0;
   border-radius: var(--radius-xl);
   color: var(--text);
   background: transparent;
@@ -908,7 +900,7 @@ textarea:focus-visible {
 .profile-card input,
 .profile-card textarea {
   width: 100%;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-md);
   color: var(--field-text);
   background: var(--field-bg);
@@ -934,8 +926,7 @@ textarea:focus-visible {
 
 .profile-card input:focus,
 .profile-card textarea:focus {
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--line));
-  box-shadow: inset 4px 0 0 var(--brand-mark);
+  box-shadow: none;
 }
 
 .dialog-actions {
@@ -963,13 +954,13 @@ textarea:focus-visible {
 .primary-button {
   color: #ffffff;
   background: var(--primary);
-  border: 1px solid var(--primary-strong);
+  border: 0;
   box-shadow: none;
 }
 
 .secondary-button {
   color: var(--text);
-  border: 1px solid var(--glass-border);
+  border: 0;
   background: var(--surface-soft);
   box-shadow: none;
 }
@@ -982,7 +973,7 @@ textarea:focus-visible {
   z-index: 30;
   max-width: min(348px, calc(100vw - 32px));
   padding: 11px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 0;
   border-radius: var(--radius-md);
   background: rgba(18, 24, 34, 0.9);
   color: #ffffff;
@@ -1009,7 +1000,7 @@ textarea:focus-visible {
 
 .history-item {
   padding: 12px 13px;
-  border: 1px solid var(--glass-border);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--surface-soft);
   box-shadow: none;
@@ -1176,7 +1167,7 @@ textarea:focus-visible {
 
   .chat-app {
     height: min(880px, calc(100vh - 48px));
-    border: 1px solid var(--glass-border);
+    border: 0;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-soft);
   }
