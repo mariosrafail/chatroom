@@ -1,4 +1,4 @@
-const { neon } = require("@neondatabase/serverless");
+const { ensureAuthSchema, getSession, getSql } = require("../lib/auth");
 
 const allowedRooms = new Set(["General"]);
 
@@ -6,20 +6,12 @@ const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+  "Cache-Control": "no-store",
   "Content-Type": "application/json",
+  Vary: "Cookie",
 };
 
-let sql;
 let schemaReady;
-
-function getSql() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not configured");
-  }
-
-  sql ??= neon(process.env.DATABASE_URL);
-  return sql;
-}
 
 function json(statusCode, body) {
   return {
@@ -119,6 +111,10 @@ exports.handler = async (event) => {
   let db;
   try {
     db = getSql();
+    await ensureAuthSchema(db);
+    if (!(await getSession(event, db))) {
+      return json(401, { error: "Authentication required" });
+    }
     await ensureSchema(db);
   } catch (error) {
     return json(500, { error: error.message });

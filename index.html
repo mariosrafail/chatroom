@@ -13,7 +13,28 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="auth-pending">
+    <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
+      <form class="auth-card" id="authForm">
+        <div class="auth-heart" aria-hidden="true">♥</div>
+        <div>
+          <h1 id="authTitle">Private chat</h1>
+          <p>Enter the password to continue.</p>
+        </div>
+        <label for="passwordInput">Password</label>
+        <input
+          id="passwordInput"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+          autofocus
+        />
+        <p class="auth-error" id="authError" role="alert" hidden></p>
+        <button class="primary-button auth-submit" id="authSubmit" type="submit">Unlock</button>
+      </form>
+    </section>
+
     <main class="app-shell">
       <section class="chat-app" aria-label="Chat room">
         <header class="topbar">

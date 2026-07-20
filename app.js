@@ -2,6 +2,7 @@ const storageKey = "mobile-chat-room-profile-v2";
 const legacyStorageKeys = ["mobile-chat-room-profile"];
 const profileCookieName = "soulmate_profile_name";
 const apiUrl = "/.netlify/functions/messages";
+const authUrl = "/.netlify/functions/auth";
 const appName = "Your Soul Mate <3";
 const pollMs = 3000;
 const notificationIcon = "/icons/icon-192.png";
@@ -88,6 +89,11 @@ const editInput = document.querySelector("#editInput");
 const cancelEditButton = document.querySelector("#cancelEditButton");
 const historyDialog = document.querySelector("#historyDialog");
 const historyList = document.querySelector("#historyList");
+const authGate = document.querySelector("#authGate");
+const authForm = document.querySelector("#authForm");
+const authInput = document.querySelector("#passwordInput");
+const authError = document.querySelector("#authError");
+const authSubmit = document.querySelector("#authSubmit");
 let selectedMessage = null;
 let longPressTimer = null;
 let lastTypingSentAt = 0;
@@ -100,6 +106,64 @@ let menuSwipeStartProgress = 0;
 let menuSwipePanelWidth = 0;
 let menuSwipeTracking = false;
 let menuSwipeDragging = false;
+let appStarted = false;
+
+function showAuthGate(message = "") {
+  document.body.classList.add("auth-pending");
+  authGate.hidden = false;
+  authError.textContent = message;
+  authError.hidden = !message;
+  window.setTimeout(() => authInput.focus(), 0);
+}
+
+function unlockApp() {
+  authGate.hidden = true;
+  document.body.classList.remove("auth-pending");
+  authInput.value = "";
+}
+
+async function authenticatedFetch(resource, options) {
+  const response = await window.fetch(resource, options);
+  if (response.status === 401) {
+    showAuthGate("Your session expired. Enter the password again.");
+    throw new Error("Authentication required");
+  }
+
+  return response;
+}
+
+function startApp() {
+  if (appStarted) {
+    return;
+  }
+
+  appStarted = true;
+  resizeInput();
+  updateSunTheme();
+  render();
+  fetchMessagesForDate(getLocalDateKey());
+  window.setInterval(() => fetchMessages(), pollMs);
+  window.setInterval(updateSunTheme, 60000);
+
+  if (!state.profileName) {
+    openProfileDialog({ required: true });
+  }
+}
+
+async function initializeAuthentication() {
+  try {
+    const response = await window.fetch(authUrl, { cache: "no-store" });
+    if (response.ok) {
+      unlockApp();
+      startApp();
+      return;
+    }
+
+    showAuthGate();
+  } catch {
+    showAuthGate("Could not connect. Check your internet connection and try again.");
+  }
+}
 
 function loadProfileName() {
   const saved = readStoredProfileName();
@@ -541,7 +605,7 @@ async function fetchMessages({ showLoading = false, older = false } = {}) {
       params.set("viewer", state.profileName);
     }
 
-    const response = await fetch(`${apiUrl}?${params.toString()}`);
+    const response = await authenticatedFetch(`${apiUrl}?${params.toString()}`);
     if (!response.ok) {
       throw new Error("Message fetch failed");
     }
@@ -597,7 +661,7 @@ async function fetchMessagesForDate(dateKey) {
       params.set("viewer", state.profileName);
     }
 
-    const response = await fetch(`${apiUrl}?${params.toString()}`);
+    const response = await authenticatedFetch(`${apiUrl}?${params.toString()}`);
     if (!response.ok) {
       throw new Error("Day message fetch failed");
     }
@@ -635,7 +699,7 @@ async function sendTypingStatus(isTyping) {
   }
 
   try {
-    await fetch(apiUrl, {
+    await authenticatedFetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -890,7 +954,7 @@ async function saveEditedMessage() {
   }
 
   try {
-    const response = await fetch(apiUrl, {
+    const response = await authenticatedFetch(apiUrl, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -927,7 +991,7 @@ async function deleteSelectedMessage() {
   }
 
   try {
-    const response = await fetch(apiUrl, {
+    const response = await authenticatedFetch(apiUrl, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -1069,7 +1133,7 @@ async function addMessage(text) {
   keepComposerFocused();
 
   try {
-    const response = await fetch(apiUrl, {
+    const response = await authenticatedFetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1408,13 +1472,35 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
-resizeInput();
-updateSunTheme();
-render();
-fetchMessagesForDate(getLocalDateKey());
-setInterval(() => fetchMessages(), pollMs);
-setInterval(updateSunTheme, 60000);
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  authSubmit.disabled = true;
+  authError.hidden = true;
 
-if (!state.profileName) {
-  openProfileDialog({ required: true });
-}
+  try {
+    const response = await window.fetch(authUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: authInput.value }),
+    });
+
+    if (!response.ok) {
+      showAuthGate(response.status === 401 ? "Wrong password." : "Could not unlock the chat. Try again.");
+      authInput.select();
+      return;
+    }
+
+    const wasAlreadyStarted = appStarted;
+    unlockApp();
+    startApp();
+    if (wasAlreadyStarted) {
+      fetchMessagesForDate(state.activeDate);
+    }
+  } catch {
+    showAuthGate("Could not connect. Check your internet connection and try again.");
+  } finally {
+    authSubmit.disabled = false;
+  }
+});
+
+initializeAuthentication();

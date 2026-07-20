@@ -179,6 +179,97 @@ button:disabled {
   cursor: default;
 }
 
+body.auth-pending .app-shell {
+  visibility: hidden;
+}
+
+.auth-gate {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    var(--chat-romance-pattern),
+    var(--bg-deep);
+}
+
+.auth-gate[hidden] {
+  display: none;
+}
+
+.auth-card {
+  width: min(100%, 380px);
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-strong);
+}
+
+.auth-card h1,
+.auth-card p {
+  margin: 0;
+}
+
+.auth-card h1 {
+  margin-bottom: 5px;
+  color: var(--text-strong);
+  font-size: 1.45rem;
+}
+
+.auth-card > div p,
+.auth-card > label {
+  color: var(--muted);
+}
+
+.auth-card > label {
+  margin-bottom: -9px;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.auth-card input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  outline: none;
+  color: var(--field-text);
+  background: var(--field-bg);
+}
+
+.auth-card input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.auth-heart {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  font-size: 1.65rem;
+  background: var(--accent-warm);
+}
+
+.auth-card .auth-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.auth-submit {
+  min-height: 48px;
+  width: 100%;
+}
+
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible {

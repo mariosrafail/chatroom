@@ -1,4 +1,4 @@
-const cacheName = "soulmate-chat-v5";
+const cacheName = "soulmate-chat-v6";
 const assets = [
   "/",
   "/index.html",
@@ -25,11 +25,20 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
+  const url = new URL(event.request.url);
+  if (event.request.method !== "GET" || url.pathname.startsWith("/.netlify/functions/")) {
     return;
   }
 
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then((response) => response || caches.match("/")))
+    fetch(event.request).catch(() =>
+      caches.match(event.request).then((response) => {
+        if (response) {
+          return response;
+        }
+
+        return event.request.mode === "navigate" ? caches.match("/") : Response.error();
+      })
+    )
   );
 });
