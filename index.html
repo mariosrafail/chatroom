@@ -75,7 +75,13 @@
 
         <form class="composer" id="messageForm">
           <label class="sr-only" for="messageInput">Message</label>
-          <textarea id="messageInput" rows="1" placeholder="Write a message..." autocomplete="off"></textarea>
+          <textarea
+            id="messageInput"
+            rows="1"
+            maxlength="20000"
+            placeholder="Write a message..."
+            autocomplete="off"
+          ></textarea>
           <button class="send-button" type="submit" aria-label="Send">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m22 2-7 20-4-9-9-4 20-7Z" />
@@ -116,7 +122,7 @@
         </div>
         <label>
           Message
-          <textarea id="editInput" rows="4" maxlength="1000"></textarea>
+          <textarea id="editInput" rows="4" maxlength="20000"></textarea>
         </label>
         <div class="dialog-actions">
           <button class="secondary-button" type="button" id="cancelEditButton">Cancel</button>

@@ -1,6 +1,7 @@
 const { ensureAuthSchema, getSession, getSql } = require("../lib/auth");
 
 const allowedRooms = new Set(["General"]);
+const messageMaxLength = 20000;
 
 const headers = {
   "Access-Control-Allow-Origin": "*",
@@ -313,7 +314,7 @@ exports.handler = async (event) => {
       return json(200, { typing: true });
     }
 
-    const text = cleanText(payload.text, 1000);
+    const text = cleanText(payload.text, messageMaxLength);
 
     if (!text) {
       return json(400, { error: "Message text is required" });
@@ -351,7 +352,7 @@ exports.handler = async (event) => {
     const id = Number(payload.id);
     const room = cleanRoom(payload.room);
     const author = cleanText(payload.author, 24);
-    const text = cleanText(payload.text, 1000);
+    const text = cleanText(payload.text, messageMaxLength);
 
     if (!Number.isSafeInteger(id) || id <= 0 || !author || !text) {
       return json(400, { error: "Invalid edit request" });
