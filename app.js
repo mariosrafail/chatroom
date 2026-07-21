@@ -80,13 +80,6 @@ const calendarPanel = document.querySelector("#calendarPanel");
 const calendarScrim = document.querySelector("#calendarScrim");
 const dayList = document.querySelector("#dayList");
 const todayButton = document.querySelector("#todayButton");
-const messageMenu = document.querySelector("#messageMenu");
-const editMessageButton = document.querySelector("#editMessageButton");
-const deleteMessageButton = document.querySelector("#deleteMessageButton");
-const editDialog = document.querySelector("#editDialog");
-const editForm = document.querySelector("#editForm");
-const editInput = document.querySelector("#editInput");
-const cancelEditButton = document.querySelector("#cancelEditButton");
 const historyDialog = document.querySelector("#historyDialog");
 const historyList = document.querySelector("#historyList");
 const authGate = document.querySelector("#authGate");
@@ -94,8 +87,6 @@ const authForm = document.querySelector("#authForm");
 const authInput = document.querySelector("#passwordInput");
 const authError = document.querySelector("#authError");
 const authSubmit = document.querySelector("#authSubmit");
-let selectedMessage = null;
-let longPressTimer = null;
 let lastTypingSentAt = 0;
 let typingStopTimer = null;
 let historyTouchStartY = 0;
@@ -386,7 +377,6 @@ function renderMessages({ scroll = "preserve" } = {}) {
     bubble.textContent = message.text;
 
     item.append(bubble);
-    attachMessageActions(item, message);
 
     if (message.editedAt) {
       const edited = document.createElement("button");
@@ -467,41 +457,6 @@ function renderTypingIndicator() {
   bubble.append(names, dots);
   item.append(bubble);
   messagesEl.append(item);
-}
-
-function attachMessageActions(element, message) {
-  const canOpenActions = (event) => !event.target.closest("button, a, input, textarea, select");
-
-  element.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || !canOpenActions(event)) {
-      return;
-    }
-
-    window.clearTimeout(longPressTimer);
-    longPressTimer = window.setTimeout(() => {
-      event.preventDefault();
-      showMessageMenu(message, event.clientX, event.clientY);
-    }, 520);
-  });
-
-  element.addEventListener("pointerup", () => window.clearTimeout(longPressTimer));
-  element.addEventListener("pointercancel", () => window.clearTimeout(longPressTimer));
-  element.addEventListener("pointerleave", () => window.clearTimeout(longPressTimer));
-  element.addEventListener("contextmenu", (event) => {
-    if (!canOpenActions(event)) {
-      return;
-    }
-
-    event.preventDefault();
-    showMessageMenu(message, event.clientX, event.clientY);
-  });
-  element.addEventListener("dblclick", (event) => {
-    if (!canOpenActions(event)) {
-      return;
-    }
-
-    showMessageMenu(message, event.clientX, event.clientY);
-  });
 }
 
 function isGroupedMessage(firstMessage, secondMessage) {
@@ -894,126 +849,6 @@ function showToast(message) {
 
 function isTodayActive() {
   return state.activeDate === getLocalDateKey();
-}
-
-function canModifyMessage(message) {
-  return Boolean(
-    message &&
-      message.chatDate === getLocalDateKey() &&
-      message.author === state.profileName &&
-      /^\d+$/.test(message.id)
-  );
-}
-
-function showMessageMenu(message, x, y) {
-  selectedMessage = message;
-  const canModify = canModifyMessage(message);
-
-  if (!canModify) {
-    closeMessageMenu();
-    return;
-  }
-
-  editMessageButton.hidden = !canModify;
-  deleteMessageButton.hidden = !canModify;
-
-  messageMenu.hidden = false;
-  const rect = messageMenu.getBoundingClientRect();
-  const left = Math.min(Math.max(10, x - rect.width / 2), window.innerWidth - rect.width - 10);
-  const top = Math.min(Math.max(10, y - rect.height - 12), window.innerHeight - rect.height - 10);
-
-  messageMenu.style.left = `${left}px`;
-  messageMenu.style.top = `${top}px`;
-}
-
-function closeMessageMenu() {
-  messageMenu.hidden = true;
-}
-
-function openEditDialog() {
-  if (!canModifyMessage(selectedMessage)) {
-    closeMessageMenu();
-    return;
-  }
-
-  editInput.value = selectedMessage.text;
-  closeMessageMenu();
-  editDialog.showModal();
-  editInput.focus();
-}
-
-async function saveEditedMessage() {
-  if (!canModifyMessage(selectedMessage)) {
-    return;
-  }
-
-  const text = cleanMessageText(editInput.value);
-  if (!text || text === selectedMessage.text) {
-    editDialog.close();
-    return;
-  }
-
-  try {
-    const response = await authenticatedFetch(apiUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: selectedMessage.id,
-        room: state.activeRoom,
-        author: state.profileName,
-        text,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Edit failed");
-    }
-
-    editDialog.close();
-    await fetchMessagesForDate(state.activeDate);
-  } catch {
-    showToast("Could not edit message.");
-  }
-}
-
-async function deleteSelectedMessage() {
-  if (!canModifyMessage(selectedMessage)) {
-    closeMessageMenu();
-    return;
-  }
-
-  const confirmed = window.confirm("Delete this message?");
-  closeMessageMenu();
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    const response = await authenticatedFetch(apiUrl, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: selectedMessage.id,
-        room: state.activeRoom,
-        author: state.profileName,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Delete failed");
-    }
-
-    state.messages = state.messages.filter((message) => message.id !== selectedMessage.id);
-    selectedMessage = null;
-    render();
-    fetchMessagesForDate(state.activeDate);
-  } catch {
-    showToast("Could not delete message.");
-  }
 }
 
 function showEditHistory(message) {
@@ -1445,18 +1280,6 @@ menuButton.addEventListener("click", openCalendar);
 closeCalendarButton.addEventListener("click", closeCalendar);
 calendarScrim.addEventListener("click", closeCalendar);
 todayButton.addEventListener("click", selectToday);
-editMessageButton.addEventListener("click", openEditDialog);
-deleteMessageButton.addEventListener("click", deleteSelectedMessage);
-cancelEditButton.addEventListener("click", () => editDialog.close());
-editForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  saveEditedMessage();
-});
-document.addEventListener("pointerdown", (event) => {
-  if (!messageMenu.hidden && !messageMenu.contains(event.target)) {
-    closeMessageMenu();
-  }
-});
 document.addEventListener("selectstart", (event) => {
   if (event.target.closest(".message")) {
     event.preventDefault();
